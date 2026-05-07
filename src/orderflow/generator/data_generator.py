@@ -9,7 +9,7 @@ import pandas as pd
 from faker import Faker
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 @dataclass(frozen=True)
@@ -895,6 +895,3 @@ def main() -> None:
     generator.generate()
     print(f"Generated synthetic source data in: {generator.output_root}")
 
-
-if __name__ == "__main__":
-    main()

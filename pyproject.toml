@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "orderflow-analytics-platform"
+name = "orderflow-data-platform"
 version = "0.1.0"
 description = "Production-style ecommerce data engineering project with synthetic source data generation."
 requires-python = ">=3.11"
@@ -12,17 +12,8 @@ dependencies = [
     "faker>=25.0.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "ruff>=0.6.0",
-    "black>=24.0.0",
-]
+[project.scripts]
+orderflow-generate-data = "orderflow.generator.data_generator:main"
 
-[tool.ruff]
-line-length = 100
-target-version = "py311"
-
-[tool.black]
-line-length = 100
-target-version = ["py311"]
+[tool.setuptools.packages.find]
+where = ["src"]
