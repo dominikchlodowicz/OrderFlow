@@ -8,7 +8,6 @@ from typing import Any
 import pandas as pd
 from faker import Faker
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -91,7 +90,13 @@ class OrderFlowGenerator:
     PAYMENT_METHODS = ["card", "blik", "bank_transfer", "paypal"]
     CARRIERS = ["InPost", "DPD", "DHL", "UPS", "Poczta Polska"]
     DEVICES = ["desktop", "mobile", "tablet"]
-    EVENT_TYPES = ["page_view", "product_view", "add_to_cart", "checkout_started", "purchase_completed"]
+    EVENT_TYPES = [
+        "page_view",
+        "product_view",
+        "add_to_cart",
+        "checkout_started",
+        "purchase_completed",
+    ]
     SOURCE_CHANNELS = ["organic", "paid_search", "email", "social", "direct"]
 
     def __init__(self, config: GeneratorConfig) -> None:
@@ -151,7 +156,9 @@ class OrderFlowGenerator:
             if load_date == all_dates[0]:
                 rows["customers"].extend(self._as_loaded_rows(self.customers, load_date))
                 rows["products"].extend(self._as_loaded_rows(self.products, load_date))
-                rows["marketing_campaigns"].extend(self._as_loaded_rows(self.marketing_campaigns, load_date))
+                rows["marketing_campaigns"].extend(
+                    self._as_loaded_rows(self.marketing_campaigns, load_date)
+                )
             else:
                 rows["customers"].extend(self._generate_new_customers(load_date))
                 rows["customers"].extend(self._generate_customer_updates(load_date))
@@ -273,7 +280,9 @@ class OrderFlowGenerator:
 
     def _generate_customer_updates(self, load_date) -> list[dict[str, Any]]:
         rows = []
-        sample_size = min(len(self.customers), max(1, int(len(self.customers) * self.config.customer_update_rate)))
+        sample_size = min(
+            len(self.customers), max(1, int(len(self.customers) * self.config.customer_update_rate))
+        )
 
         for customer in random.sample(self.customers, sample_size):
             if random.random() > 0.75:
@@ -298,14 +307,18 @@ class OrderFlowGenerator:
 
     def _generate_product_updates(self, load_date) -> list[dict[str, Any]]:
         rows = []
-        sample_size = min(len(self.products), max(1, int(len(self.products) * self.config.product_update_rate)))
+        sample_size = min(
+            len(self.products), max(1, int(len(self.products) * self.config.product_update_rate))
+        )
 
         for product in random.sample(self.products, sample_size):
             updated = product.copy()
             change_type = random.choice(["price", "category", "inactive"])
 
             if change_type == "price":
-                updated["unit_price"] = round(float(product["unit_price"]) * random.uniform(0.9, 1.15), 2)
+                updated["unit_price"] = round(
+                    float(product["unit_price"]) * random.uniform(0.9, 1.15), 2
+                )
             elif change_type == "category":
                 updated["category"] = random.choice(self.PRODUCT_CATEGORIES)
             elif change_type == "inactive":
@@ -318,7 +331,9 @@ class OrderFlowGenerator:
 
         return rows
 
-    def _generate_daily_orders(self, load_date) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def _generate_daily_orders(
+        self, load_date
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         multiplier = self._daily_order_multiplier(load_date)
         order_count = max(0, int(random.gauss(self.config.avg_orders_per_day * multiplier, 15)))
         orders = []
@@ -332,10 +347,16 @@ class OrderFlowGenerator:
             order_id = f"ord_{uuid4().hex[:12]}"
             order_created_at = self._random_timestamp_on(load_date)
             campaign_id = self._choose_campaign(load_date)
-            source_channel = self._campaign_channel(campaign_id) if campaign_id else random.choice(self.SOURCE_CHANNELS)
+            source_channel = (
+                self._campaign_channel(campaign_id)
+                if campaign_id
+                else random.choice(self.SOURCE_CHANNELS)
+            )
 
             item_count = random.randint(1, 5)
-            selected_products = random.sample(active_products, k=min(item_count, len(active_products)))
+            selected_products = random.sample(
+                active_products, k=min(item_count, len(active_products))
+            )
 
             gross_amount = 0.0
             discount_amount = 0.0
@@ -390,13 +411,17 @@ class OrderFlowGenerator:
 
         return orders, order_items
 
-    def _generate_payments(self, daily_orders: list[dict[str, Any]], load_date) -> list[dict[str, Any]]:
+    def _generate_payments(
+        self, daily_orders: list[dict[str, Any]], load_date
+    ) -> list[dict[str, Any]]:
         rows = []
 
         for loaded_order in daily_orders:
             order_id = loaded_order["order_id"]
             order = self.orders_by_id[order_id]
-            payment_created_at = order["order_created_at"] + pd.Timedelta(minutes=random.randint(1, 30))
+            payment_created_at = order["order_created_at"] + pd.Timedelta(
+                minutes=random.randint(1, 30)
+            )
             first_failed = random.random() < self.config.payment_failure_rate
 
             if first_failed:
@@ -405,13 +430,21 @@ class OrderFlowGenerator:
                     attempt_number=1,
                     status="failed",
                     created_at=payment_created_at,
-                    failure_reason=random.choice(["insufficient_funds", "card_declined", "timeout"]),
+                    failure_reason=random.choice(
+                        ["insufficient_funds", "card_declined", "timeout"]
+                    ),
                 )
                 self._record_payment(failed_payment)
-                rows.append(self._maybe_late_loaded_row(failed_payment, load_date, payment_created_at, "payments"))
+                rows.append(
+                    self._maybe_late_loaded_row(
+                        failed_payment, load_date, payment_created_at, "payments"
+                    )
+                )
 
                 if random.random() < self.config.payment_retry_success_rate:
-                    second_created_at = payment_created_at + pd.Timedelta(minutes=random.randint(5, 90))
+                    second_created_at = payment_created_at + pd.Timedelta(
+                        minutes=random.randint(5, 90)
+                    )
                     captured_payment = self._payment_row(
                         order=order,
                         attempt_number=2,
@@ -420,12 +453,18 @@ class OrderFlowGenerator:
                         failure_reason=None,
                     )
                     self._record_payment(captured_payment)
-                    rows.append(self._maybe_late_loaded_row(captured_payment, load_date, second_created_at, "payments"))
+                    rows.append(
+                        self._maybe_late_loaded_row(
+                            captured_payment, load_date, second_created_at, "payments"
+                        )
+                    )
                     self._schedule_order_update(order_id, "paid", second_created_at, load_date)
                     self._schedule_authorized_status_if_needed(order, second_created_at, load_date)
                     self._schedule_shipment(order_id, second_created_at, load_date)
                 else:
-                    self._schedule_order_update(order_id, "cancelled", payment_created_at, load_date)
+                    self._schedule_order_update(
+                        order_id, "cancelled", payment_created_at, load_date
+                    )
             else:
                 captured_payment = self._payment_row(
                     order=order,
@@ -435,7 +474,11 @@ class OrderFlowGenerator:
                     failure_reason=None,
                 )
                 self._record_payment(captured_payment)
-                rows.append(self._maybe_late_loaded_row(captured_payment, load_date, payment_created_at, "payments"))
+                rows.append(
+                    self._maybe_late_loaded_row(
+                        captured_payment, load_date, payment_created_at, "payments"
+                    )
+                )
                 self._schedule_authorized_status_if_needed(order, payment_created_at, load_date)
                 self._schedule_order_update(order_id, "paid", payment_created_at, load_date)
                 self._schedule_shipment(order_id, payment_created_at, load_date)
@@ -466,7 +509,9 @@ class OrderFlowGenerator:
     def _record_payment(self, payment: dict[str, Any]) -> None:
         self.payments_by_order_id.setdefault(payment["order_id"], []).append(payment.copy())
 
-    def _schedule_authorized_status_if_needed(self, order: dict[str, Any], captured_at: pd.Timestamp, load_date) -> None:
+    def _schedule_authorized_status_if_needed(
+        self, order: dict[str, Any], captured_at: pd.Timestamp, load_date
+    ) -> None:
         if random.random() < 0.28:
             authorized_at = captured_at - pd.Timedelta(seconds=random.randint(30, 240))
             authorized_payment = self._payment_row(
@@ -480,14 +525,18 @@ class OrderFlowGenerator:
             self._record_payment(authorized_payment)
             self._schedule_row("payments", authorized_payment, authorized_at, load_date)
 
-    def _schedule_order_update(self, order_id: str, status: str, event_timestamp: pd.Timestamp, current_load_date) -> None:
+    def _schedule_order_update(
+        self, order_id: str, status: str, event_timestamp: pd.Timestamp, current_load_date
+    ) -> None:
         order = self.orders_by_id[order_id].copy()
         order["order_status"] = status
         order["order_updated_at"] = event_timestamp
         self.orders_by_id[order_id].update(order)
         self._schedule_row("orders", order, event_timestamp, current_load_date)
 
-    def _schedule_shipment(self, order_id: str, payment_timestamp: pd.Timestamp, current_load_date) -> None:
+    def _schedule_shipment(
+        self, order_id: str, payment_timestamp: pd.Timestamp, current_load_date
+    ) -> None:
         order = self.orders_by_id[order_id]
         shipped_at = payment_timestamp + pd.Timedelta(hours=random.randint(4, 48))
         estimated_delivery_at = shipped_at + pd.Timedelta(days=random.randint(1, 4))
@@ -518,7 +567,9 @@ class OrderFlowGenerator:
             self._schedule_row("shipments", lost_shipment, lost_at, current_load_date)
             return
 
-        delivered_at = estimated_delivery_at + pd.Timedelta(days=random.randint(1, 3) if is_late else 0)
+        delivered_at = estimated_delivery_at + pd.Timedelta(
+            days=random.randint(1, 3) if is_late else 0
+        )
         delivered_shipment = shipment.copy()
         delivered_shipment["shipment_status"] = "delivered"
         delivered_shipment["delivered_at"] = delivered_at
@@ -534,7 +585,9 @@ class OrderFlowGenerator:
         if random.random() < self.config.refund_rate:
             self._schedule_refund(order_id, delivered_at, current_load_date)
 
-    def _schedule_refund(self, order_id: str, delivered_at: pd.Timestamp, current_load_date) -> None:
+    def _schedule_refund(
+        self, order_id: str, delivered_at: pd.Timestamp, current_load_date
+    ) -> None:
         order = self.orders_by_id[order_id]
         payment = self._last_captured_payment(order_id)
         if payment is None:
@@ -553,7 +606,9 @@ class OrderFlowGenerator:
             "refund_id": f"ref_{uuid4().hex[:12]}",
             "order_id": order_id,
             "payment_id": payment["payment_id"],
-            "refund_reason": random.choice(["damaged", "wrong_size", "late_delivery", "customer_changed_mind"]),
+            "refund_reason": random.choice(
+                ["damaged", "wrong_size", "late_delivery", "customer_changed_mind"]
+            ),
             "refund_amount": refund_amount,
             "currency": order["currency"],
             "created_at": refund_created_at,
@@ -580,16 +635,21 @@ class OrderFlowGenerator:
             self._record_payment(refund_payment)
             self._schedule_row("payments", refund_payment, refund_created_at, current_load_date)
             new_order_status = "partially_refunded" if is_partial else "refunded"
-            self._schedule_order_update(order_id, new_order_status, refund["processed_at"], current_load_date)
+            self._schedule_order_update(
+                order_id, new_order_status, refund["processed_at"], current_load_date
+            )
 
     def _last_captured_payment(self, order_id: str) -> dict[str, Any] | None:
         payments = [
-            p for p in self.payments_by_order_id.get(order_id, [])
+            p
+            for p in self.payments_by_order_id.get(order_id, [])
             if p["payment_status"] == "captured"
         ]
         return payments[-1] if payments else None
 
-    def _generate_web_events(self, load_date, daily_orders: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _generate_web_events(
+        self, load_date, daily_orders: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         rows = []
         session_count = max(0, int(random.gauss(self.config.avg_web_sessions_per_day, 60)))
         active_customers = [c for c in self.customers if c["customer_status"] == "active"]
@@ -620,8 +680,14 @@ class OrderFlowGenerator:
                 if event_type == "purchase_completed" and not checkout_happened:
                     event_type = "product_view"
 
-                product = random.choice(active_products) if active_products and event_type in {"product_view", "add_to_cart"} else None
-                event_timestamp = session_start + pd.Timedelta(minutes=random.randint(0, 90), seconds=random.randint(0, 59))
+                product = (
+                    random.choice(active_products)
+                    if active_products and event_type in {"product_view", "add_to_cart"}
+                    else None
+                )
+                event_timestamp = session_start + pd.Timedelta(
+                    minutes=random.randint(0, 90), seconds=random.randint(0, 59)
+                )
 
                 row = {
                     "event_id": f"evt_{uuid4().hex[:16]}",
@@ -636,10 +702,16 @@ class OrderFlowGenerator:
                     "country_code": country,
                     "page_url": self._page_url(event_type, product),
                 }
-                rows.append(self._maybe_late_loaded_row(row, load_date, event_timestamp, "web_events"))
+                rows.append(
+                    self._maybe_late_loaded_row(row, load_date, event_timestamp, "web_events")
+                )
 
-        for order in random.sample(daily_orders, k=min(len(daily_orders), max(0, len(purchased_order_ids) // 4))):
-            event_timestamp = order["order_created_at"] - pd.Timedelta(minutes=random.randint(1, 20))
+        for order in random.sample(
+            daily_orders, k=min(len(daily_orders), max(0, len(purchased_order_ids) // 4))
+        ):
+            event_timestamp = order["order_created_at"] - pd.Timedelta(
+                minutes=random.randint(1, 20)
+            )
             row = {
                 "event_id": f"evt_{uuid4().hex[:16]}",
                 "session_id": f"sess_{uuid4().hex[:12]}",
@@ -657,7 +729,9 @@ class OrderFlowGenerator:
 
         return self._keep_rows_due_today(rows, load_date)
 
-    def _schedule_row(self, table_name: str, row: dict[str, Any], event_timestamp: pd.Timestamp, current_load_date) -> None:
+    def _schedule_row(
+        self, table_name: str, row: dict[str, Any], event_timestamp: pd.Timestamp, current_load_date
+    ) -> None:
         arrival_date = self._arrival_date(event_timestamp, current_load_date)
         self.scheduled_events.append(
             {
@@ -698,7 +772,9 @@ class OrderFlowGenerator:
         self.scheduled_events = [e for e in self.scheduled_events if e["arrival_date"] > load_date]
         return due
 
-    def _materialize_scheduled_events(self, events: list[dict[str, Any]], load_date, rows: dict[str, list[dict[str, Any]]]) -> None:
+    def _materialize_scheduled_events(
+        self, events: list[dict[str, Any]], load_date, rows: dict[str, list[dict[str, Any]]]
+    ) -> None:
         for event in events:
             table_name = event["table_name"]
             row = self._with_load_metadata(event["row"], load_date, event["event_timestamp"])
@@ -707,7 +783,9 @@ class OrderFlowGenerator:
     def _arrival_date(self, event_timestamp: pd.Timestamp, current_load_date) -> Any:
         base_arrival_date = max(event_timestamp.date(), current_load_date)
         if random.random() < self.config.late_arrival_rate:
-            return (pd.Timestamp(base_arrival_date) + pd.Timedelta(days=random.randint(1, 3))).date()
+            return (
+                pd.Timestamp(base_arrival_date) + pd.Timedelta(days=random.randint(1, 3))
+            ).date()
         return base_arrival_date
 
     def _inject_quality_issues(self, rows: dict[str, list[dict[str, Any]]]) -> None:
@@ -727,7 +805,9 @@ class OrderFlowGenerator:
         if rows["shipments"] and random.random() < self.config.invalid_record_rate:
             shipment = random.choice(rows["shipments"])
             if shipment.get("delivered_at") not in (None, ""):
-                shipment["delivered_at"] = pd.Timestamp(shipment["shipped_at"]) - pd.Timedelta(days=1)
+                shipment["delivered_at"] = pd.Timestamp(shipment["shipped_at"]) - pd.Timedelta(
+                    days=1
+                )
 
         if rows["refunds"] and random.random() < self.config.invalid_record_rate:
             random.choice(rows["refunds"])["payment_id"] = "missing_payment"
@@ -782,9 +862,18 @@ class OrderFlowGenerator:
         return rows
 
     def _as_loaded_rows(self, rows: list[dict[str, Any]], load_date) -> list[dict[str, Any]]:
-        return [self._with_load_metadata(row, load_date, row.get("updated_at") or row.get("created_at") or pd.Timestamp(load_date)) for row in rows]
+        return [
+            self._with_load_metadata(
+                row,
+                load_date,
+                row.get("updated_at") or row.get("created_at") or pd.Timestamp(load_date),
+            )
+            for row in rows
+        ]
 
-    def _with_load_metadata(self, row: dict[str, Any], load_date, event_timestamp: Any | None = None) -> dict[str, Any]:
+    def _with_load_metadata(
+        self, row: dict[str, Any], load_date, event_timestamp: Any | None = None
+    ) -> dict[str, Any]:
         result = row.copy()
         result["load_date"] = load_date
         result["loaded_at"] = pd.Timestamp(load_date) + pd.Timedelta(
@@ -836,8 +925,11 @@ class OrderFlowGenerator:
 
     def _choose_campaign(self, date_value) -> str | None:
         active_campaigns = [
-            c for c in self.marketing_campaigns
-            if pd.Timestamp(c["start_date"]).date() <= date_value <= pd.Timestamp(c["end_date"]).date()
+            c
+            for c in self.marketing_campaigns
+            if pd.Timestamp(c["start_date"]).date()
+            <= date_value
+            <= pd.Timestamp(c["end_date"]).date()
         ]
         if not active_campaigns or random.random() > 0.42:
             return None
@@ -869,14 +961,18 @@ class OrderFlowGenerator:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate OrderFlow synthetic ecommerce source data.")
+    parser = argparse.ArgumentParser(
+        description="Generate OrderFlow synthetic ecommerce source data."
+    )
     parser.add_argument("--start-date", default="2026-01-01")
     parser.add_argument("--end-date", default="2026-03-31")
     parser.add_argument("--output-dir", default="data/raw")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--avg-orders-per-day", type=int, default=80)
     parser.add_argument("--avg-web-sessions-per-day", type=int, default=350)
-    parser.add_argument("--no-clean", action="store_true", help="Do not delete existing output before generation.")
+    parser.add_argument(
+        "--no-clean", action="store_true", help="Do not delete existing output before generation."
+    )
     return parser.parse_args()
 
 
@@ -894,4 +990,3 @@ def main() -> None:
     generator = OrderFlowGenerator(config)
     generator.generate()
     print(f"Generated synthetic source data in: {generator.output_root}")
-

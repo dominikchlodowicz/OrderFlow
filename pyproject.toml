@@ -10,10 +10,47 @@ requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2.0",
     "faker>=25.0.0",
+    "azure-storage-blob>=12.28.0",
+    "python-dotenv>=1.2.2",
+    "black>=26.3.1",
+    "ruff>=0.15.12",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0"
 ]
 
 [project.scripts]
 orderflow-generate-data = "orderflow.generator.data_generator:main"
+orderflow-upload-adls = "orderflow.ingestion.adls_upload:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # import sorting
+    "B",   # bugbear
+    "UP",  # modern Python syntax
+]
+ignore = []
+
+[tool.black]
+line-length = 100
+target-version = ["py314"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src/orderflow"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
