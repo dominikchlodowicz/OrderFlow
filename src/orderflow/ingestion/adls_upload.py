@@ -11,7 +11,7 @@ class AdlsUploadConfig:
     local_path: Path
     container_name: str
     connection_string: str
-    target_prefix: str = "bronze/landing"
+    target_prefix: str = "landing"
 
 
 def upload_directory(config: AdlsUploadConfig) -> int:
@@ -51,7 +51,7 @@ def config_from_env() -> AdlsUploadConfig:
         local_path=local_path,
         container_name=os.environ["AZURE_STORAGE_CONTAINER_NAME"],
         connection_string=os.environ["AZURE_STORAGE_CONNECTION_STRING"],
-        target_prefix=os.environ.get("ADLS_BRONZE_LANDING_PREFIX", "bronze/landing"),
+        target_prefix=os.environ.get("ADLS_LANDING_PREFIX", "landing"),
     )
 
 

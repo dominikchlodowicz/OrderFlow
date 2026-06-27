@@ -103,7 +103,7 @@ def test_config_from_env_builds_config_from_environment(tmp_path, monkeypatch) -
     monkeypatch.setenv("LOCAL_RAW_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("AZURE_STORAGE_CONTAINER_NAME", "landing")
     monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "connection-string")
-    monkeypatch.setenv("ADLS_BRONZE_LANDING_PREFIX", "bronze/custom")
+    monkeypatch.setenv("ADLS_LANDING_PREFIX", "landing")
 
     config = adls_upload.config_from_env()
 
@@ -112,7 +112,7 @@ def test_config_from_env_builds_config_from_environment(tmp_path, monkeypatch) -
         local_path=tmp_path,
         container_name="landing",
         connection_string="connection-string",
-        target_prefix="bronze/custom",
+        target_prefix="landing",
     )
 
 
@@ -132,7 +132,7 @@ def test_config_from_env_uses_optional_defaults(tmp_path, monkeypatch) -> None:
         local_path=Path("data/raw"),
         container_name="landing",
         connection_string="connection-string",
-        target_prefix="bronze/landing",
+        target_prefix="landing",
     )
 
 
