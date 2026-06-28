@@ -15,8 +15,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 class GeneratorConfig:
     """Configuration for the synthetic source-system generator."""
 
-    start_date: str = "2026-01-01"
-    end_date: str = "2026-03-31"
+    start_date: str = "2026-06-01"
+    end_date: str = "2026-06-30"
     output_dir: str = "data/raw"
     seed: int = 42
 
@@ -964,8 +964,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate OrderFlow synthetic ecommerce source data."
     )
-    parser.add_argument("--start-date", default="2026-01-01")
-    parser.add_argument("--end-date", default="2026-03-31")
+    parser.add_argument("--start-date", default="2026-06-01")
+    parser.add_argument("--end-date", default="2026-06-30")
     parser.add_argument("--output-dir", default="data/raw")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--avg-orders-per-day", type=int, default=80)

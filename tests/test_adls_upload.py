@@ -48,16 +48,16 @@ def test_upload_directory_uploads_csv_files_to_expected_blob_paths(
     )
     config = AdlsUploadConfig(
         local_path=local_path,
-        container_name="landing",
+        container_name="lakehouse",
         connection_string="UseDevelopmentStorage=true",
-        target_prefix="bronze/landing/",
+        target_prefix="bronze/landing",
     )
 
     uploaded_count = adls_upload.upload_directory(config)
 
     assert uploaded_count == 2
     from_connection_string.assert_called_once_with("UseDevelopmentStorage=true")
-    blob_service_client.get_container_client.assert_called_once_with("landing")
+    blob_service_client.get_container_client.assert_called_once_with("lakehouse")
 
     expected_blob_paths = {
         "bronze/landing/customers.csv",
@@ -101,18 +101,18 @@ def test_config_from_env_builds_config_from_environment(tmp_path, monkeypatch) -
     load_dotenv = Mock()
     monkeypatch.setattr(adls_upload, "load_dotenv", load_dotenv)
     monkeypatch.setenv("LOCAL_RAW_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("AZURE_STORAGE_CONTAINER_NAME", "landing")
+    monkeypatch.setenv("AZURE_STORAGE_CONTAINER_NAME", "lakehouse")
     monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "connection-string")
-    monkeypatch.setenv("ADLS_LANDING_PREFIX", "landing")
+    monkeypatch.setenv("ADLS_LANDING_PREFIX", "bronze/landing")
 
     config = adls_upload.config_from_env()
 
     load_dotenv.assert_called_once_with()
     assert config == AdlsUploadConfig(
         local_path=tmp_path,
-        container_name="landing",
+        container_name="lakehouse",
         connection_string="connection-string",
-        target_prefix="landing",
+        target_prefix="bronze/landing",
     )
 
 
@@ -122,17 +122,17 @@ def test_config_from_env_uses_optional_defaults(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "data" / "raw").mkdir(parents=True)
     monkeypatch.delenv("LOCAL_RAW_DATA_DIR", raising=False)
-    monkeypatch.delenv("ADLS_BRONZE_LANDING_PREFIX", raising=False)
-    monkeypatch.setenv("AZURE_STORAGE_CONTAINER_NAME", "landing")
+    monkeypatch.delenv("ADLS_LANDING_PREFIX", raising=False)
+    monkeypatch.setenv("AZURE_STORAGE_CONTAINER_NAME", "lakehouse")
     monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "connection-string")
 
     config = adls_upload.config_from_env()
 
     assert config == AdlsUploadConfig(
         local_path=Path("data/raw"),
-        container_name="landing",
+        container_name="lakehouse",
         connection_string="connection-string",
-        target_prefix="landing",
+        target_prefix="bronze/landing",
     )
 
 
