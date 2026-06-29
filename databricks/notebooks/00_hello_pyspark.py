@@ -1,18 +1,69 @@
 # Databricks notebook source
+# This notebook is a Databricks wrapper.
+# Real Spark logic lives in:
+# src/orderflow/spark/hello_orders.py
+
+import sys
+
+# COMMAND ----------
+
+def add_project_src_to_pythonpath() -> None:
+    """
+    Adds the repo's src/ directory to Python path inside Databricks.
+
+    Needed because this project uses src/ layout:
+
+        src/orderflow/...
+
+    Databricks can run notebooks from the repo, but Python may not automatically
+    know where src/ is.
+    """
+    notebook_path = (
+        dbutils.notebook.entry_point
+        .getDbutils()
+        .notebook()
+        .getContext()
+        .notebookPath()
+        .get()
+    )
+
+    if "/databricks/" not in notebook_path:
+        raise RuntimeError(
+            f"Could not infer repo root from notebook path: {notebook_path}"
+        )
+
+    repo_workspace_path = notebook_path.split("/databricks/")[0]
+
+    if repo_workspace_path.startswith("/Workspace/"):
+        repo_filesystem_path = repo_workspace_path
+    else:
+        repo_filesystem_path = f"/Workspace{repo_workspace_path}"
+
+    src_path = f"{repo_filesystem_path}/src"
+
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+
+    print(f"Notebook path: {notebook_path}")
+    print(f"Added to Python path: {src_path}")
+
+
+add_project_src_to_pythonpath()
+
+# COMMAND ----------
+
+from orderflow.spark.hello_orders import run_hello_orders
+
+# COMMAND ----------
+
 print("Hello from Azure Databricks + PySpark")
 print(f"Spark version: {spark.version}")
 
 # COMMAND ----------
 
-orders = [
-    (1, "customer_001", "2026-06-01", 120.50),
-    (2, "customer_002", "2026-06-01", 75.20),
-    (3, "customer_003", "2026-06-02", 310.00),
-]
+orders_df, daily_orders_df = run_hello_orders(spark)
 
-columns = ["order_id", "customer_id", "order_date", "order_amount"]
-
-orders_df = spark.createDataFrame(orders, columns)
+# COMMAND ----------
 
 display(orders_df)
 
@@ -21,14 +72,5 @@ display(orders_df)
 orders_df.printSchema()
 
 # COMMAND ----------
-
-from pyspark.sql.functions import col, sum as spark_sum
-
-daily_orders_df = (
-    orders_df
-    .groupBy("order_date")
-    .agg(spark_sum(col("order_amount")).alias("daily_order_amount"))
-    .orderBy("order_date")
-)
 
 display(daily_orders_df)
