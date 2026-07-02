@@ -222,3 +222,7 @@ commands.md
 
 data/raw/*
 !data/raw/.gitkeep
+
+data/bronze/
+data/silver/
+data/gold/
