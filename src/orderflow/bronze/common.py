@@ -30,7 +30,7 @@ def add_standard_bronze_metadata(
 ) -> DataFrame:
     LOAD_DATE_PATTERN = r"load_date=(\d{4}-\d{2}-\d{2})"
     FILE_NAME_PATTERN = r"([^/\\]+)$"
-    
+
     source_file_path = F.input_file_name()
 
     raw_record_hash = F.sha2(
@@ -102,6 +102,9 @@ def get_source_load_dates(df: DataFrame) -> list[str]:
 
 
 def build_replace_where(load_dates: Iterable[str]) -> str:
+    """
+    When rewriting Bronze table, only replace the days that are currently getting loaded.
+    """
     load_dates = list(load_dates)
 
     if not load_dates:

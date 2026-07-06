@@ -8,6 +8,7 @@ def build_local_spark(app_name: str) -> SparkSession:
         .appName(app_name)
         .master("local[2]")
         .config("spark.ui.enabled", "false")
+        .config("spark.driver.host", "127.0.0.1")
         .config("spark.driver.bindAddress", "127.0.0.1")
         .config("spark.sql.shuffle.partitions", "2")
         .config(
