@@ -21,6 +21,16 @@ if not output_path:
 
 # COMMAND ----------
 
+from notebooks._bootstrap import add_project_src_to_pythonpath
+
+# MAGIC %run ../_bootstrap
+
+# COMMAND ----------
+
+add_project_src_to_pythonpath(dbutils)
+
+# COMMAND ----------
+
 from orderflow.bronze.calendar import run_calendar_bronze
 
 run_calendar_bronze(
