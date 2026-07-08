@@ -1,27 +1,13 @@
 # Databricks notebook source
 
 # COMMAND ----------
-# Widgets = parameters passed by Databricks job or manually in notebook
 
-dbutils.widgets.text("input_path", "")
-dbutils.widgets.text("output_path", "")
-dbutils.widgets.text("source_system", "adls_raw")
+from typing import Any
 
-# COMMAND ----------
-
-input_path = dbutils.widgets.get("input_path")
-output_path = dbutils.widgets.get("output_path")
-source_system = dbutils.widgets.get("source_system")
-
-if not input_path:
-    raise ValueError("input_path widget is required.")
-
-if not output_path:
-    raise ValueError("output_path widget is required.")
+dbutils: Any
+spark: Any
 
 # COMMAND ----------
-
-from notebooks._bootstrap import add_project_src_to_pythonpath
 
 # MAGIC %run ../_bootstrap
 
@@ -31,11 +17,41 @@ add_project_src_to_pythonpath(dbutils)
 
 # COMMAND ----------
 
+ACCOUNT_NAME = "storderflowdevfrc1"
+SECRET_SCOPE = "orderflow"
+SECRET_KEY = "storderflowdevfrc1-key"
+
+spark.conf.set(
+    f"fs.azure.account.auth.type.{ACCOUNT_NAME}.dfs.core.windows.net",
+    "SharedKey",
+)
+
+spark.conf.set(
+    f"fs.azure.account.key.{ACCOUNT_NAME}.dfs.core.windows.net",
+    dbutils.secrets.get(
+        scope=SECRET_SCOPE,
+        key=SECRET_KEY,
+    ).strip(),
+)
+
+# COMMAND ----------
+
 from orderflow.bronze.calendar import run_calendar_bronze
+from orderflow.config.constants import (
+    CALENDAR_BRONZE_INPUT_PATH,
+    CALENDAR_BRONZE_OUTPUT_PATH,
+)
+
+# COMMAND ----------
+
+print("Running Bronze calendar ingestion")
+print(f"Input path:  {CALENDAR_BRONZE_INPUT_PATH}")
+print(f"Output path: {CALENDAR_BRONZE_OUTPUT_PATH}")
 
 run_calendar_bronze(
     spark=spark,
-    input_path=input_path,
-    output_path=output_path,
-    source_system=source_system,
+    input_path=CALENDAR_BRONZE_INPUT_PATH,
+    output_path=CALENDAR_BRONZE_OUTPUT_PATH,
 )
+
+print("Bronze calendar ingestion completed successfully.")

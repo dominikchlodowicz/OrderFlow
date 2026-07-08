@@ -21,17 +21,17 @@ class BronzeWriteConfig:
     FILE_NAME_PATTERN = r"([^/\\]+)$"
 
 def add_standard_bronze_metadata(
-        df: DataFrame,
-        *,
-        source_system: str,
-        source_entity: str,
-        ingestion_run_id: str,
-        raw_columns: list[str],
+    df: DataFrame,
+    *,
+    source_system: str,
+    source_entity: str,
+    ingestion_run_id: str,
+    raw_columns: list[str],
 ) -> DataFrame:
     LOAD_DATE_PATTERN = r"load_date=(\d{4}-\d{2}-\d{2})"
     FILE_NAME_PATTERN = r"([^/\\]+)$"
 
-    source_file_path = F.input_file_name()
+    source_file_path = F.col("_metadata.file_path")
 
     raw_record_hash = F.sha2(
         F.concat_ws(
@@ -44,24 +44,19 @@ def add_standard_bronze_metadata(
         256,
     )
 
-    return  (
+    return (
         df
-        .withColumn("_source_system", F.lit(source_system))
-        .withColumn("_source_entity", F.lit(source_entity))
+        .withColumn("_source_file_path", source_file_path)
         .withColumn(
             "_source_file_name",
-            F.regexp_extract(source_file_path, FILE_NAME_PATTERN, 1),
-
+            F.regexp_extract(F.col("_source_file_path"), FILE_NAME_PATTERN, 1),
         )
         .withColumn(
             "_source_load_date",
-            F.regexp_extract(
-                source_file_path,
-                LOAD_DATE_PATTERN,
-                1,
-            )
+            F.regexp_extract(F.col("_source_file_path"), LOAD_DATE_PATTERN, 1),
         )
-        .withColumn("_source_file_path", source_file_path)
+        .withColumn("_source_system", F.lit(source_system))
+        .withColumn("_source_entity", F.lit(source_entity))
         .withColumn("_ingestion_run_id", F.lit(ingestion_run_id))
         .withColumn("_ingested_at", F.current_timestamp())
         .withColumn("_raw_record_hash", raw_record_hash)
