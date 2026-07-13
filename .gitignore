@@ -217,13 +217,20 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Helper notes
 TODO.md
 commands.md
 
+# local data for local spark development
 data/raw/*
 !data/raw/.gitkeep
-
 data/bronze/
 data/silver/
 data/gold/
 .databricks
+
+# duckdb
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+.duckdb/
