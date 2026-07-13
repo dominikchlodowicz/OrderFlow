@@ -2,6 +2,9 @@
 STORAGE_ACCOUNT_NAME = "storderflowdevfrc1"
 LAKEHOUSE_CONTAINER = "lakehouse"
 
+SECRET_SCOPE = "orderflow"
+STORAGE_ACCOUNT_KEY_SECRET_NAME = "storderflowdevfrc1-key"
+
 ADLS_BASE_PATH = (
     f"abfss://{LAKEHOUSE_CONTAINER}"
     f"@{STORAGE_ACCOUNT_NAME}.dfs.core.windows.net"
