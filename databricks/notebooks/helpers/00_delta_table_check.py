@@ -1,26 +1,29 @@
+# Databricks notebook source
+
+# COMMAND ----------
+
 from typing import Any
 
 dbutils: Any
 spark: Any
 
-adls2_path_to_check = "/silver/delta/calendar"
+# COMMAND ----------
 
-spark.conf.set(
-    "fs.azure.account.key.storderflowdevfrc1.dfs.core.windows.net",
-    dbutils.secrets.get(
-        scope="orderflow",
-        key="storderflowdevfrc1-key",
-    ),
+# MAGIC %run ../_bootstrap
+
+# COMMAND ----------
+
+bootstrap_databricks_notebook(
+    dbutils=dbutils,
+    spark=spark,
 )
 
-path = (
-    "abfss://lakehouse"
-    "@storderflowdevfrc1.dfs.core.windows.net" +
-    adls2_path_to_check
+# COMMAND ----------
+
+path = build_adls2_path("/silver/delta/calendar")
+
+verify_delta_table(
+    spark=spark,
+    path=path,
+    order_by="date_day",
 )
-
-df = spark.read.format("delta").load(path)
-
-print("Row count:", df.count())
-df.printSchema()
-display(df.orderBy("date_day"))
