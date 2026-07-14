@@ -1,0 +1,13 @@
+Table silver_calendar {
+  date_day date
+	year integer
+	quarter integer
+	month integer
+	day_of_month integer
+	day_of_week integer
+	day_name varchar
+	week_of_year integer
+	is_weekend boolean
+	is_polish_public_holiday boolean
+	holiday_name varchar
+}
