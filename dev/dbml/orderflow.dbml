@@ -1,13 +1,54 @@
+Table bronze_calendar {
+	date_day varchar
+	year varchar
+	quarter varchar
+	month varchar
+	day_of_month varchar
+	day_of_week varchar
+	day_name varchar
+	week_of_year varchar
+	is_weekend varchar
+	is_polish_public_holiday varchar
+	holiday_name varchar
+	load_date varchar
+	loaded_at varchar
+	_source_system varchar
+	_source_entity varchar
+	_source_file_name varchar
+	_source_load_date varchar
+	_source_file_path varchar
+	_ingestion_run_id varchar
+	_ingested_at varchar
+	_raw_record_hash varchar
+}
+
 Table silver_calendar {
   date_day date
-	year integer
-	quarter integer
-	month integer
-	day_of_month integer
-	day_of_week integer
-	day_name varchar
-	week_of_year integer
-	is_weekend boolean
-	is_polish_public_holiday boolean
-	holiday_name varchar
+  year integer
+  quarter integer
+  month integer
+  day_of_month integer
+  day_of_week integer
+  day_name varchar
+  week_of_year integer
+  is_weekend boolean
+  is_polish_public_holiday boolean
+  holiday_name varchar
+}
+
+Table dim_calendar {
+  date_key int
+  date_day date
+  year int
+  quarter int
+  month int
+  month_name varchar
+  day_of_month int
+  day_of_week int
+  day_name varchar
+  week_of_year int
+  is_weekend boolean
+  is_polish_public_holiday boolean
+  holiday_name varchar
+  _gold_processed_at timestamp
 }
