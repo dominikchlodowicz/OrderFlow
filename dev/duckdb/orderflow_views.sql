@@ -8,3 +8,7 @@ FROM delta_scan('data/bronze/calendar');
 CREATE OR REPLACE VIEW silver_calendar AS
 SELECT *
 FROM delta_scan('data/silver/calendar');
+
+CREATE OR REPLACE VIEW dim_calendar AS
+SELECT *
+FROM delta_scan('data/gold/dim_calendar');
