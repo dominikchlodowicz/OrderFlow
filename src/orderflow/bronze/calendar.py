@@ -4,6 +4,9 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import StringType, StructField, StructType
 
 from orderflow.bronze.common import add_standard_bronze_metadata
+from orderflow.common.delta import write_delta
+from orderflow.common.validation import validate_required_columns
+
 
 CALENDAR_COLUMNS = [
     "date_day",
@@ -21,12 +24,24 @@ CALENDAR_COLUMNS = [
     "loaded_at",
 ]
 
+
 CALENDAR_SCHEMA = StructType(
-    [StructField(column, StringType(), True) for column in CALENDAR_COLUMNS]
+    [
+        StructField(
+            column_name,
+            StringType(),
+            nullable=True,
+        )
+        for column_name in CALENDAR_COLUMNS
+    ]
 )
 
-def read_calendar_raw(spark: SparkSession, input_path: str | Path) -> DataFrame:
-    return (
+
+def read_calendar_raw(
+    spark: SparkSession,
+    input_path: str | Path,
+) -> DataFrame:
+    raw_df = (
         spark.read
         .format("csv")
         .schema(CALENDAR_SCHEMA)
@@ -35,12 +50,25 @@ def read_calendar_raw(spark: SparkSession, input_path: str | Path) -> DataFrame:
         .load(str(input_path))
     )
 
+    validate_required_columns(
+        raw_df,
+        CALENDAR_COLUMNS,
+        dataset_name="Raw calendar",
+    )
+
+    return raw_df
+
+
 def run_calendar_bronze(
     spark: SparkSession,
     input_path: str | Path,
     output_path: str | Path,
 ) -> None:
-    raw_df = read_calendar_raw(spark, input_path)
+    raw_df = read_calendar_raw(
+        spark=spark,
+        input_path=input_path,
+    )
+
     bronze_df = add_standard_bronze_metadata(
         raw_df,
         source_system="local_files",
@@ -49,10 +77,10 @@ def run_calendar_bronze(
         raw_columns=CALENDAR_COLUMNS,
     )
 
-    (
-        bronze_df.write
-        .format("delta")
-        .mode("overwrite")
-        .partitionBy("_source_load_date")
-        .save(str(output_path))
+    write_delta(
+        df=bronze_df,
+        path=output_path,
+        mode="overwrite",
+        overwrite_schema=True,
+        partition_by=["_source_load_date"],
     )
