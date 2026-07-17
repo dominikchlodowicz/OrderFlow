@@ -213,11 +213,14 @@ def test_transform_dim_calendar_rejects_missing_required_columns(
         ],
     ).drop("holiday_name")
 
-    with pytest.raises(
-        ValueError,
-        match="Missing required Silver calendar columns",
-    ):
+    with pytest.raises(ValueError) as exception_info:
         transform_dim_calendar(silver_df)
+
+    error_message = str(exception_info.value)
+
+    assert "Silver calendar" in error_message
+    assert "missing required columns" in error_message
+    assert "holiday_name" in error_message
 
 
 def test_transform_dim_calendar_rejects_null_date_key(

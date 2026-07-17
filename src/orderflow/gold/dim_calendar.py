@@ -3,8 +3,11 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from orderflow.common.delta import read_delta, write_delta
+from orderflow.common.validation import validate_required_columns
 
-REQUIRED_SILVER_COLUMNS = [
+
+DIM_CALENDAR_REQUIRED_COLUMNS = [
     "date_day",
     "year",
     "quarter",
@@ -19,20 +22,9 @@ REQUIRED_SILVER_COLUMNS = [
 ]
 
 
-def validate_required_columns(df: DataFrame) -> None:
-    missing_columns = [
-        column_name
-        for column_name in REQUIRED_SILVER_COLUMNS
-        if column_name not in df.columns
-    ]
-
-    if missing_columns:
-        raise ValueError(
-            f"Missing required Silver calendar columns: {missing_columns}"
-        )
-
-
-def transform_dim_calendar(silver_calendar_df: DataFrame) -> DataFrame:
+def transform_dim_calendar(
+    silver_calendar_df: DataFrame,
+) -> DataFrame:
     """
     Converts the cleaned Silver calendar entity into an analytical
     Gold calendar dimension.
@@ -42,24 +34,27 @@ def transform_dim_calendar(silver_calendar_df: DataFrame) -> DataFrame:
         source_loaded_at
         _silver_processed_at
     """
-    validate_required_columns(silver_calendar_df)
+    validate_required_columns(
+        silver_calendar_df,
+        DIM_CALENDAR_REQUIRED_COLUMNS,
+        dataset_name="Silver calendar",
+    )
 
     dim_calendar_df = silver_calendar_df.select(
         F.date_format(
             F.col("date_day"),
             "yyyyMMdd",
-        ).cast("int").alias("date_key"),
-
+        )
+        .cast("int")
+        .alias("date_key"),
         F.col("date_day"),
         F.col("year"),
         F.col("quarter"),
         F.col("month"),
-
         F.date_format(
             F.col("date_day"),
             "MMMM",
         ).alias("month_name"),
-
         F.col("day_of_month"),
         F.col("day_of_week"),
         F.col("day_name"),
@@ -77,7 +72,9 @@ def transform_dim_calendar(silver_calendar_df: DataFrame) -> DataFrame:
     )
 
 
-def validate_dim_calendar(df: DataFrame) -> None:
+def validate_dim_calendar(
+    df: DataFrame,
+) -> None:
     null_key_count = (
         df.filter(
             F.col("date_key").isNull()
@@ -95,7 +92,9 @@ def validate_dim_calendar(df: DataFrame) -> None:
     duplicate_key_count = (
         df.groupBy("date_key")
         .count()
-        .filter(F.col("count") > 1)
+        .filter(
+            F.col("count") > 1
+        )
         .count()
     )
 
@@ -110,12 +109,11 @@ def write_dim_calendar(
     dim_calendar_df: DataFrame,
     output_path: str | Path,
 ) -> None:
-    (
-        dim_calendar_df.write
-        .format("delta")
-        .mode("overwrite")
-        .option("overwriteSchema", "true")
-        .save(str(output_path))
+    write_delta(
+        df=dim_calendar_df,
+        path=output_path,
+        mode="overwrite",
+        overwrite_schema=True,
     )
 
 
@@ -124,10 +122,9 @@ def run_dim_calendar(
     input_path: str | Path,
     output_path: str | Path,
 ) -> None:
-    silver_calendar_df = (
-        spark.read
-        .format("delta")
-        .load(str(input_path))
+    silver_calendar_df = read_delta(
+        spark=spark,
+        path=input_path,
     )
 
     dim_calendar_df = transform_dim_calendar(
