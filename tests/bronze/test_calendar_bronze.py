@@ -4,17 +4,7 @@ from pathlib import Path
 
 from orderflow.bronze.calendar import CALENDAR_COLUMNS, run_calendar_bronze
 
-STANDARD_BRONZE_METADATA_COLUMNS = [
-    "_source_file_path",
-    "_source_file_name",
-    "_source_load_date",
-    "_source_system",
-    "_source_entity",
-    "_ingestion_run_id",
-    "_ingested_at",
-    "_raw_record_hash",
-]
-
+from helpers.constants import STANDARD_BRONZE_METADATA_COLUMNS
 
 def _calendar_row(
     *,
