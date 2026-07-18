@@ -15,6 +15,9 @@ ADLS_BASE_PATH = (
 CALENDAR_BRONZE_INPUT_PATH = f"{ADLS_BASE_PATH}/bronze/landing/calendar"
 CALENDAR_BRONZE_OUTPUT_PATH = f"{ADLS_BASE_PATH}/bronze/delta/calendar"
 
+CUSTOMERS_BRONZE_INPUT_PATH = f"{ADLS_BASE_PATH}/bronze/landing/customers"
+CUSTOMERS_BRONZE_OUTPUT_PATH = f"{ADLS_BASE_PATH}/bronze/delta/customers"
+
 CALENDAR_SILVER_INPUT_PATH = f"{ADLS_BASE_PATH}/bronze/delta/calendar"
 CALENDAR_SILVER_OUTPUT_PATH = f"{ADLS_BASE_PATH}/silver/delta/calendar"
 
