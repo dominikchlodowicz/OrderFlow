@@ -1,5 +1,5 @@
 from orderflow.bronze.customers import run_customers_bronze
-from orderflow.spark.session import build_local_spark
+from orderflow.local_spark.session import build_local_spark
 
 spark = build_local_spark("bronze-calendar")
 

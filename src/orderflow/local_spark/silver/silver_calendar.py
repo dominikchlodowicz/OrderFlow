@@ -1,5 +1,5 @@
 from orderflow.silver.calendar import run_calendar_silver
-from orderflow.spark.session import build_local_spark
+from orderflow.local_spark.session import build_local_spark
 
 spark = build_local_spark("silver-calendar")
 
