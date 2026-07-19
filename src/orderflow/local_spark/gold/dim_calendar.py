@@ -1,5 +1,5 @@
 from orderflow.gold.dim_calendar import run_dim_calendar
-from orderflow.spark.session import build_local_spark
+from orderflow.local_spark.session import build_local_spark
 
 spark = build_local_spark("gold-calendar")
 

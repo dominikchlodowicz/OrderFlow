@@ -3,9 +3,8 @@ from pathlib import Path
 from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
-from orderflow.common.delta import read_delta, write_delta
 from orderflow.common.validation import validate_required_columns
-
+from orderflow.silver.common import run_silver_pipeline, write_silver
 
 CALENDAR_REQUIRED_COLUMNS = [
     "date_day",
@@ -202,11 +201,9 @@ def write_calendar_silver(
     silver_df: DataFrame,
     output_path: str | Path,
 ) -> None:
-    write_delta(
-        df=silver_df,
-        path=output_path,
-        mode="overwrite",
-        overwrite_schema=True,
+    write_silver(
+        silver_df=silver_df,
+        output_path=output_path,
     )
 
 
@@ -215,16 +212,9 @@ def run_calendar_silver(
     input_path: str | Path,
     output_path: str | Path,
 ) -> None:
-    bronze_df = read_delta(
+    run_silver_pipeline(
         spark=spark,
-        path=input_path,
-    )
-
-    silver_df = transform_calendar_silver(
-        bronze_df
-    )
-
-    write_calendar_silver(
-        silver_df=silver_df,
+        input_path=input_path,
         output_path=output_path,
+        transform=transform_calendar_silver,
     )

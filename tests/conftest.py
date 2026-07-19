@@ -1,7 +1,7 @@
 import pytest
 from pyspark.sql import SparkSession
 
-from orderflow.spark.session import build_local_spark
+from orderflow.local_spark.session import build_local_spark
 
 
 @pytest.fixture(scope="session")
