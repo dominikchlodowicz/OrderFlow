@@ -29,4 +29,7 @@ DIM_CALENDAR_OUTPUT_PATH = (
     f"{ADLS_BASE_PATH}/gold/delta/dim_calendar"
 )
 
-
+DIM_CUSTOMERS_INPUT_PATH = CUSTOMERS_SILVER_OUTPUT_PATH
+DIM_CUSTOMERS_OUTPUT_PATH = (
+    f"{ADLS_BASE_PATH}/gold/delta/dim_customers"
+)
