@@ -20,3 +20,7 @@ FROM delta_scan('data/bronze/customers');
 CREATE OR REPLACE VIEW silver_customers AS
 SELECT *
 FROM delta_scan('data/silver/customers');
+
+CREATE OR REPLACE VIEW dim_customers AS
+SELECT *
+FROM delta_scan('data/gold/dim_customers');
