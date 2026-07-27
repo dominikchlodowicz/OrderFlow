@@ -9,7 +9,7 @@ Table dim_customers {
   last_name varchar
   full_name varchar
 
-  country_code varchar
+  country_code varchar [not null, Note: 'Uppercase ISO 3166-1 alpha-2 country code']
   city varchar
 
   customer_status varchar
@@ -22,8 +22,10 @@ Table dim_customers {
   _gold_processed_at timestamp
 }
 
+
 Table dim_calendar {
   date_key int [pk, not null]
+
   date_day date [not null, unique]
   year int [not null]
   quarter int [not null]
@@ -36,7 +38,223 @@ Table dim_calendar {
   is_weekend boolean [not null]
   is_polish_public_holiday boolean [not null]
   holiday_name varchar
+
   _gold_processed_at timestamp [not null]
 }
 
 
+Table fct_order_items {
+  Note: 'Grain: one accepted order item identified by order_item_id'
+
+  order_item_key bigint [pk, not null]
+  order_item_id varchar [not null, unique, note: 'Source order-item identifier']
+  order_id varchar [not null, note: 'Source order identifier; degenerate dimension']
+
+  customer_key bigint [not null, ref: > dim_customers.customer_key]
+  product_key bigint [not null, ref: > dim_products.product_key]
+  order_date_key int [not null, ref: > dim_calendar.date_key]
+  currency_key bigint [not null, ref: > dim_currency.currency_key]
+  campaign_key bigint [ref: > dim_campaigns.campaign_key]
+
+  quantity int [not null, note: 'Must be greater than 0']
+  unit_price decimal(18, 2) [not null, note: 'Must be greater than or equal to 0']
+  discount_amount decimal(18, 2) [not null, note: 'Standardized to 0 when source is null']
+  gross_amount decimal(18, 2) [not null, note: 'quantity * unit_price']
+  line_total decimal(18, 2) [not null, note: 'gross_amount - discount_amount']
+
+  order_item_created_date_key int [not null, ref: > dim_calendar.date_key] 
+
+  _gold_processed_at timestamp [not null]
+}
+
+
+Table fct_orders {
+  Note: 'Grain: one accepted order identified by order_id'
+  
+  order_key bigint [pk, not null]
+  order_id varchar [not null, unique, note: 'Source order identifier']
+
+  customer_key bigint [ref: > dim_customers.customer_key]
+
+  order_create_at_date_key int [not null, ref: > dim_calendar.date_key]
+  order_created_at timestamp [not null]
+  order_updated_at timestamp [note: 'Must not precede order_created_at']
+
+  gross_amount decimal(18, 2) [not null, note: 'Must be >= 0']
+  discount_amount decimal(18, 2) [not null, note: 'Null standardized to 0; must be between 0 and gross_amount']
+  net_amount decimal(18, 2) [not null, note: 'Must equal gross_amount - discount_amount']
+
+  order_status varchar [not null, note: 'One of: created, paid, shipped, cancelled, returned']
+
+  _gold_processed_at timestamp [not null]
+}
+
+
+Table fct_payments {
+  Note: 'Grain: one accepted payment indentified by payment_id'
+
+  payment_key bigint [pk, not null]
+  payment_id varchar [not null, note: 'Source payment identifier']
+
+  order_id varchar [not null]
+
+  payment_attempt_number int [not null]
+  payment_method varchar [
+    not null,
+    note: 'One of: card, paypal, blik, bank_transfer, cash_on_delivery, online_installments'
+  ]
+
+  payment_status varchar [
+    not null,
+    note: 'One of: authorized, captured, failed'
+  ]
+
+  failure_reason varchar [
+    note: 'Required when payment_status = failed; otherwise null. One of: timeout, insufficient_funds, card_declined'
+  ]
+
+
+  amount decimal(18, 2) [not null, note: 'Must be >= 0']
+
+  currency_key bigint [not null, ref: > dim_exchange_rates.currency_key]
+  currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
+
+  payment_created_date_key int [not null, ref: > dim_calendar.date_key]
+  payment_processed_date_key int [ref: > dim_calendar.date_key]
+  
+  created_at timestamp [not null]
+  processed_at timestamp [not null]
+
+  _gold_processed_at timestamp [not null]
+}
+
+
+Table fct_web_events {
+  Note: 'Grain: one accepted web event indentified by event_id'
+
+  event_key bigint [pk, not null]
+
+  session_id varchar [
+    not null,
+    note: 'Source session identifier retained as a degenerate dimension'
+  ]
+
+  anonymous_id varchar [
+    not null,
+    note: 'Source visitor identifier retained as a degenerate dimension'
+  ]
+
+  customer_key bigint [ref: > dim_customers.customer_key]
+  product_key bigint [
+    ref: > dim_products.product_key,
+    note: 'Required only for product-related event types'
+  ]
+
+  event_type varchar [not null, note: 'TODO: add `one of` after bronze ingestion to indentify different types from source data']
+  event_timestamp timestamp
+
+  campaign_id varchar
+
+  device_type varchar [not null, note: 'One of: tablet, mobile, desktop']
+  country_code varchar [not null, note: 'Uppercase ISO 3166-1 alpha-2 country code']
+
+  page_url varchar [not null]
+  
+  _gold_processed_at timestamp [not null]
+}
+
+
+Table fct_shipments {
+  Note: 'Grain: one accepted shipment indentified by shipment_id'
+
+  shipment_key bigint [pk, not null]
+  shipment_id varchar [not null, note: 'Source shipment identifier']
+
+  order_id varchar [
+    not null,
+    note: 'Source order identifier retained as a degenerate dimension'
+  ]
+
+  carrier varchar [not null]
+  shipment_status varchar [not null, note: 'One of: lost, shipped, delivered']
+
+  estimated_delivery_date_key int [ref: > dim_calendar.date_key]
+  shipped_at timestamp [not null]
+  delivered_at timestamp [note: 'If shipment_status = delivered -> not null, delivered_at >= shipped_at']
+
+  delivery_country_code varchar [not null, note: 'Uppercase ISO 3166-1 alpha-2 country code']
+  delivery_city varchar [not null]
+
+  shipping_cost decimal(18,2) [not null, note: 'Must be >=0']
+
+  _gold_processed_at timestamp [not null]
+}
+
+
+Table fct_refunds {
+  Note: 'Grain: one accepted refund indentified by refund_id'
+  
+  refund_key bigint [pk, not null]
+  refund_id varchar [not null, unique, note: 'Source refund identifier']
+
+  order_id varchar [not null]
+  payment_id varchar [not null]
+
+  refund_reason varchar
+  refund_status varchar [not null, note: 'TODO: add `one of` after bronze ingestion to indentify different types from source data']
+  refund_amount decimal(18,2) [not null, note: 'Must be >= 0']
+
+  currency_key bigint [not null, ref: > dim_exchange_rates.currency_key]
+  currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
+
+  created_at timestamp [not null]
+  processed_at timestamp [not null]
+
+  _gold_processed_at timestamp [not null]
+}
+
+
+Table dim_campaigns {
+  campaign_key bigint [pk, not null]
+  campaign_id varchar [
+    not null,
+    unique,
+    note: 'Source campaign identifier'
+  ]
+
+  campaign_name varchar [not null]
+
+  source_channel varchar [
+    note: 'Standardized channel; accepted domain defined after profiling Bronze'
+  ]
+
+  start_date_key int [not null, ref: > dim_calendar.date_key]
+  end_date_key int [ref: > dim_calendar.date_key]
+
+  start_date date [not null]
+  end_date date [
+    note: 'Nullable for open-ended campaigns; must not precede start_date'
+  ]
+
+  budget_amount decimal(18,2) [
+    not null,
+    note: 'Planned campaign budget; must be greater than 0'
+  ]
+
+  currency_key bigint [
+    not null,
+    ref: > dim_exchange_rates.currency_key
+  ]
+
+  is_active boolean [
+    not null,
+    note: 'Source-provided operational status'
+  ]
+
+  created_at timestamp [not null]
+  updated_at timestamp [
+    note: 'Must not precede created_at'
+  ]
+
+  _gold_processed_at timestamp [not null]
+}
