@@ -1,0 +1,42 @@
+Table dim_customers {
+  customer_key bigint [pk]
+  customer_id varchar [not null, unique]
+
+  email varchar
+  email_domain varchar
+  
+  first_name varchar
+  last_name varchar
+  full_name varchar
+
+  country_code varchar
+  city varchar
+
+  customer_status varchar
+  is_active_customer boolean
+  marketing_consent boolean
+
+  registered_at timestamp
+  registration_date_key int [ref: > dim_calendar.date_key]
+
+  _gold_processed_at timestamp
+}
+
+Table dim_calendar {
+  date_key int [pk, not null]
+  date_day date [not null, unique]
+  year int [not null]
+  quarter int [not null]
+  month int [not null]
+  month_name varchar [not null]
+  day_of_month int [not null]
+  day_of_week int [not null]
+  day_name varchar [not null]
+  week_of_year int [not null]
+  is_weekend boolean [not null]
+  is_polish_public_holiday boolean [not null]
+  holiday_name varchar
+  _gold_processed_at timestamp [not null]
+}
+
+

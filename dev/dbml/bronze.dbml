@@ -1,0 +1,269 @@
+Table bronze_calendar {
+    date_day varchar
+    year varchar
+    quarter varchar
+    month varchar
+    day_of_month varchar
+    day_of_week varchar
+    day_name varchar
+    week_of_year varchar
+    is_weekend varchar
+    is_polish_public_holiday varchar
+    holiday_name varchar
+    load_date varchar
+    loaded_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_customers {
+    customer_id varchar
+    email varchar
+    first_name varchar
+    last_name varchar
+    country_code varchar
+    city varchar
+    created_at varchar
+    updated_at varchar
+    customer_status varchar
+    marketing_consent varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_exchange_rate {
+    rate_date varchar
+    currency varchar
+    rate_to_pln varchar
+    source varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+
+Table bronze_marketing_campaigns {
+    campaign_id varchar
+    campaign_name varchar
+    source_channel varchar
+    start_date varchar
+    end_date varchar
+    budget_amount varchar
+    currency varchar
+    created_at varchar
+    updated_at varchar
+    is_active varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_order_items {
+    order_item_id varchar
+    order_id varchar
+    product_id varchar
+    quantity varchar
+    unit_price varchar
+    discount_amount varchar
+    line_total varchar
+    created_at varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_orders {
+    order_id varchar
+    customer_id varchar
+    order_status varchar
+    order_created_at varchar
+    order_updated_at varchar
+    country_code varchar
+    currency varchar
+    gross_amount varchar
+    discount_amount varchar
+    net_amount varchar
+    source_channel varchar
+    campaign_id varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_payments {
+    payment_id varchar
+    order_id varchar
+    payment_attempt_number varchar
+    payment_method varchar
+    payment_status varchar
+    amount varchar
+    currency varchar
+    created_at varchar
+    processed_at varchar
+    failure_reason varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_products {
+    product_id varchar
+    sku varchar
+    product_name varchar
+    category varchar
+    brand varchar
+    unit_price varchar
+    currency varchar
+    is_active varchar
+    created_at varchar
+    updated_at varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_refunds {
+    refund_id varchar
+    order_id varchar
+    payment_id varchar
+    refund_reason varchar
+    refund_amount varchar
+    currency varchar
+    created_at varchar
+    processed_at varchar
+    refund_status varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_shipments {
+    shipment_id varchar
+    order_id varchar
+    carrier varchar
+    shipment_status varchar
+    shipped_at varchar
+    estimated_delivery_at varchar
+    delivered_at varchar
+    delivery_country varchar
+    delivery_city varchar
+    shipping_cost varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
+
+Table bronze_web_events {
+    event_id varchar
+    session_id varchar
+    customer_id varchar
+    anonymous_id varchar
+    event_type varchar
+    event_timestamp varchar
+    product_id varchar
+    campaign_id varchar
+    device_type varchar
+    country_code varchar
+    page_url varchar
+    load_date varchar
+    loaded_at varchar
+    source_event_at varchar
+
+    _source_system varchar
+    _source_entity varchar
+    _source_file_name varchar
+    _source_load_date varchar
+    _source_file_path varchar
+    _ingestion_run_id varchar
+    _ingested_at varchar
+    _raw_record_hash varchar
+}
