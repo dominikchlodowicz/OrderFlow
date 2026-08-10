@@ -1,3 +1,12 @@
+TablePartial silver_lineage {
+  _source_file_name varchar [not null, note: 'Name of the physical source file containing the winning Bronze record']
+  _source_file_path varchar [not null, note: 'Full physical path of the source file containing the winning Bronze record']
+  _ingestion_run_id varchar [not null, note: 'Identifier of the Bronze ingestion run that introduced the winning record']
+  _bronze_ingested_at timestamp [not null, note: 'UTC timestamp when the winning record was written to Bronze']
+  _raw_record_hash varchar [not null, note: 'SHA-256 identifier of the exact raw source version selected for Silver']
+  _silver_processed_at timestamp [not null, note: 'UTC timestamp when the row was produced in Silver']
+}
+
 Table silver_calendar {
   date_day date
   year integer
@@ -10,184 +19,168 @@ Table silver_calendar {
   is_weekend boolean
   is_polish_public_holiday boolean
   holiday_name varchar
-}
 
+  ~silver_lineage
+}
 
 Table silver_exchange_rate {
   exchange_rate_key bigint [pk, not null]
-
   rate_date_key varchar
   rate_date date
-
   currency varchar
   rate_to_pln decimal(5, 4)
-
   source varchar
-  loaded_at varchar
+  loaded_at timestamp
 
-  _silver_processed_at timestamp
+  ~silver_lineage
 }
-
 
 Table silver_order_items {
   order_item_id varchar [pk, not null, unique]
-
   order_id varchar [not null]
   product_id varchar [not null]
-
-  quantity int [not null, note: 'Must be greater than 0']
+  quantity integer [not null, note: 'Must be greater than 0']
   unit_price decimal(18, 2) [not null, note: 'Must be greater than or equal to 0']
   discount_amount decimal(18, 2) [not null, note: 'Null standardized to 0']
   gross_amount decimal(18, 2) [not null, note: 'quantity * unit_price']
   line_total decimal(18, 2) [not null, note: 'gross_amount - discount_amount']
-
   created_at timestamp
   source_event_at timestamp
 
-  _silver_processed_at timestamp
+  ~silver_lineage
 }
-
 
 Table silver_orders {
   order_id varchar [pk, not null, unique]
-
   customer_id varchar
-
   order_status varchar [not null, note: 'One of: created, paid, shipped, cancelled, returned']
   order_created_at timestamp [not null]
   order_updated_at timestamp [note: 'Must not precede order_created_at']
-
   country_code varchar [not null, note: 'Uppercase ISO 3166-1 alpha-2 country code']
   currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
-
   gross_amount decimal(18, 2) [not null, note: 'Must be >= 0']
   discount_amount decimal(18, 2) [not null, note: 'Null standardized to 0; must be between 0 and gross_amount']
   net_amount decimal(18, 2) [not null, note: 'Must equal gross_amount - discount_amount']
-
   source_channel varchar [not null]
   campaign_id varchar
-
   source_event_at timestamp
 
-  _silver_processed_at timestamp [not null]
+  ~silver_lineage
 }
-
 
 Table silver_payments {
   payment_id varchar [pk, not null, unique, note: 'Source payment identifier']
   order_id varchar [not null, note: 'Source order identifier']
-
-  payment_attempt_number int [not null]
+  payment_attempt_number integer [not null]
   payment_method varchar [not null, note: 'One of: card, paypal, blik, bank_transfer, on delivery, online installments']
   payment_status varchar [not null, note: 'One of: captured, authorized, failed']
-  failure_reason varchar [note: 'Required when payment_status = failed then One of: timeout, insufficient_funds, card_declined. Otherwise null.']
-
+  failure_reason varchar [note: 'Required when payment_status = failed. One of: timeout, insufficient_funds, card_declined. Otherwise null.']
   amount decimal(18, 2) [not null, note: 'Must be >= 0']
   currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
-
   created_at timestamp [not null]
   processed_at timestamp [not null]
-
   load_date date
   loaded_at timestamp
-  _silver_processed_at timestamp [not null]
-}
 
+  ~silver_lineage
+}
 
 Table silver_web_events {
   event_id varchar [pk, not null, unique, note: 'Source web event identifier']
   session_id varchar [not null]
-
   customer_id varchar
   anonymous_id varchar [not null]
-
-  event_type varchar [not null, note: 'TODO: add `one of` after bronze ingestion to indentify different types from source data']
+  event_type varchar [not null, note: 'TODO: add one-of rule after Bronze ingestion to identify the event types in the source data']
   event_timestamp timestamp
-
-  product_id varchar [
-    note: 'Required only for product-related event types'
-  ]
-
+  product_id varchar [note: 'Required only for product-related event types']
   campaign_id varchar
-
   device_type varchar [not null, note: 'One of: tablet, mobile, desktop']
   country_code varchar [not null, note: 'Uppercase ISO 3166-1 alpha-2 country code']
-  
   page_url varchar [not null]
-
   loaded_at timestamp [not null]
   source_event_at timestamp [not null]
 
-  _silver_processed_at timestamp [not null]
+  ~silver_lineage
 }
-
 
 Table silver_shipments {
   shipment_id varchar [pk, not null, unique, note: 'Source shipment identifier']
   order_id varchar [not null]
-
   carrier varchar [not null]
   shipment_status varchar [not null, note: 'One of: lost, shipped, delivered']
-
   shipped_at timestamp [not null]
   estimated_delivery_at date [note: 'estimated_delivery_at >= DATE(shipped_at)']
-  delivered_at timestamp [note: 'If shipment_status = delivered -> not null, delivered_at >= shipped_at']
-
+  delivered_at timestamp [note: 'If shipment_status = delivered, must not be null and must be >= shipped_at']
   delivery_country varchar [not null]
   delivery_city varchar [not null]
-
-  shipping_cost decimal(18,2) [not null, note: 'Must be >=0']
-
+  shipping_cost decimal(18, 2) [not null, note: 'Must be >= 0']
   load_date date
   loaded_at timestamp
   source_event_at timestamp
 
-  _silver_processed_at timestamp [not null]
+  ~silver_lineage
 }
-
 
 Table silver_refunds {
   refund_id varchar [pk, not null, unique, note: 'Source refund identifier']
-
   order_id varchar [not null]
   payment_id varchar [not null]
-
   refund_reason varchar
-  refund_status varchar [not null, note: 'TODO: add `one of` after bronze ingestion to indentify different types from source data']
-  refund_amount decimal(18,2) [not null, note: 'Must be >= 0']
+  refund_status varchar [not null, note: 'TODO: add one-of rule after Bronze ingestion to identify the refund statuses in the source data']
+  refund_amount decimal(18, 2) [not null, note: 'Must be >= 0']
   currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
-
   created_at timestamp [not null]
   processed_at timestamp [not null]
-
   load_date date
   loaded_at timestamp
   source_event_at timestamp
- 
-  _silver_processed_at timestamp [not null]
-}
 
+  ~silver_lineage
+}
 
 Table silver_marketing_campaigns {
   campaign_id varchar [pk, not null, unique, note: 'Source campaign identifier']
-  campaign_name varchar  [not null]
-
+  campaign_name varchar [not null]
   source_channel varchar
-
   start_date date [not null]
   end_date date
-
   budget_amount decimal(18, 2) [not null, note: 'Must be > 0']
   currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
-
   is_active boolean [not null]
-
   created_at timestamp [not null]
   updated_at timestamp [not null]
-
   load_date date
   loaded_at timestamp
   source_event_at timestamp
 
-  _silver_processed_at timestamp [not null]
+  ~silver_lineage
+}
+
+Table silver_products {
+  product_id varchar [pk, not null, unique, note: 'Source product identifier']
+  sku varchar [not null]
+  product_name varchar [not null]
+  category varchar
+  brand varchar
+  unit_price decimal(18, 2) [not null, note: 'Must be >= 0']
+  currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
+  is_active boolean [not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  load_date date
+  loaded_at timestamp
+  source_event_at timestamp
+
+  ~silver_lineage
+}
+
+Table silver_exchange_rates {
+  rate_date date
+  currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
+  rate_to_pln decimal(18, 2) [not null, note: 'Must be >= 0.0']
+  source varchar
+  load_date date [not null]
+  loaded_at timestamp [not null]
+
+  ~silver_lineage
 }
