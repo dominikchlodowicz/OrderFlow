@@ -21,17 +21,17 @@ bootstrap_databricks_notebook(
 # COMMAND ----------
 
 from orderflow.config.constants import (
-    DIM_CALENDAR_INPUT_PATH,
-    DIM_CALENDAR_OUTPUT_PATH,
+    CALENDAR_GOLD_TABLE,
+    CALENDAR_SILVER_TABLE,
 )
-from orderflow.gold.dim_calendar import run_dim_calendar
+from orderflow.gold.dim_calendar import run_dim_calendar_tables
 
 # COMMAND ----------
 
-run_databricks_pipeline_step(
+run_databricks_table_to_table_step(
     step_name="Gold dim_calendar transformation",
-    runner=run_dim_calendar,
+    runner=run_dim_calendar_tables,
     spark=spark,
-    input_path=DIM_CALENDAR_INPUT_PATH,
-    output_path=DIM_CALENDAR_OUTPUT_PATH,
+    input_table=CALENDAR_SILVER_TABLE,
+    output_table=CALENDAR_GOLD_TABLE,
 )

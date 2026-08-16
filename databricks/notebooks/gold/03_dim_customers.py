@@ -21,17 +21,17 @@ bootstrap_databricks_notebook(
 # COMMAND ----------
 
 from orderflow.config.constants import (
-    DIM_CUSTOMERS_INPUT_PATH,
-    DIM_CUSTOMERS_OUTPUT_PATH,
+    CUSTOMERS_GOLD_TABLE,
+    CUSTOMERS_SILVER_TABLE,
 )
-from orderflow.gold.dim_customers import run_dim_customers
+from orderflow.gold.dim_customers import run_dim_customers_tables
 
 # COMMAND ----------
 
-run_databricks_pipeline_step(
+run_databricks_table_to_table_step(
     step_name="Gold dim_customers transformation",
-    runner=run_dim_customers,
+    runner=run_dim_customers_tables,
     spark=spark,
-    input_path=DIM_CUSTOMERS_INPUT_PATH,
-    output_path=DIM_CUSTOMERS_OUTPUT_PATH,
+    input_table=CUSTOMERS_SILVER_TABLE,
+    output_table=CUSTOMERS_GOLD_TABLE,
 )

@@ -4,7 +4,11 @@ from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from orderflow.common.validation import validate_required_columns
-from orderflow.silver.common import run_silver_pipeline, write_silver
+from orderflow.silver.common import (
+    run_silver_pipeline,
+    run_silver_table_pipeline,
+    write_silver,
+)
 
 CALENDAR_REQUIRED_COLUMNS = [
     "date_day",
@@ -216,5 +220,18 @@ def run_calendar_silver(
         spark=spark,
         input_path=input_path,
         output_path=output_path,
+        transform=transform_calendar_silver,
+    )
+
+
+def run_calendar_silver_tables(
+    spark: SparkSession,
+    input_table: str,
+    output_table: str,
+) -> None:
+    run_silver_table_pipeline(
+        spark=spark,
+        input_table=input_table,
+        output_table=output_table,
         transform=transform_calendar_silver,
     )

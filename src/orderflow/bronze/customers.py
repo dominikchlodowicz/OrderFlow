@@ -1,12 +1,11 @@
 from pathlib import Path
 
-from pyspark.sql.types import StringType, StructField, StructType
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql.types import StringType, StructField, StructType
 
-from orderflow.common.validation import validate_required_columns
-from orderflow.common.delta import write_delta
 from orderflow.bronze.common import add_standard_bronze_metadata
-
+from orderflow.common.delta import write_delta, write_delta_table
+from orderflow.common.validation import validate_required_columns
 
 CUSTOMERS_COLUMNS = [
     "customer_id",
@@ -57,11 +56,10 @@ def read_customers_raw(
     return raw_df
 
 
-def run_customers_bronze(
+def build_customers_bronze(
     spark: SparkSession,
     input_path: str | Path,
-    output_path: str | Path,
-) -> None:
+) -> DataFrame:
     raw_df = read_customers_raw(
         spark=spark,
         input_path=input_path
@@ -75,9 +73,41 @@ def run_customers_bronze(
         raw_columns=CUSTOMERS_COLUMNS,
     )
 
+    return bronze_df
+
+
+def run_customers_bronze(
+    spark: SparkSession,
+    input_path: str | Path,
+    output_path: str | Path,
+) -> None:
+    bronze_df = build_customers_bronze(
+        spark=spark,
+        input_path=input_path,
+    )
+
     write_delta(
         df=bronze_df,
         path=output_path,
+        mode="overwrite",
+        overwrite_schema=True,
+        partition_by=["_source_load_date"],
+    )
+
+
+def run_customers_bronze_table(
+    spark: SparkSession,
+    input_path: str | Path,
+    output_table: str,
+) -> None:
+    bronze_df = build_customers_bronze(
+        spark=spark,
+        input_path=input_path,
+    )
+
+    write_delta_table(
+        df=bronze_df,
+        table_name=output_table,
         mode="overwrite",
         overwrite_schema=True,
         partition_by=["_source_load_date"],

@@ -86,3 +86,33 @@ def test_run_silver_pipeline_does_not_write_when_transform_fails(
         )
 
     write_silver.assert_not_called()
+
+
+def test_run_silver_table_pipeline_uses_registered_tables(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spark = Mock(spec=SparkSession)
+    bronze_df = Mock(spec=DataFrame)
+    silver_df = Mock(spec=DataFrame)
+    read_delta_table = Mock(return_value=bronze_df)
+    transform = Mock(return_value=silver_df)
+    write_silver_table = Mock()
+    monkeypatch.setattr(common, "read_delta_table", read_delta_table)
+    monkeypatch.setattr(common, "write_silver_table", write_silver_table)
+
+    common.run_silver_table_pipeline(
+        spark=spark,
+        input_table="orderflow_dev.bronze.calendar",
+        output_table="orderflow_dev.silver.calendar",
+        transform=transform,
+    )
+
+    read_delta_table.assert_called_once_with(
+        spark=spark,
+        table_name="orderflow_dev.bronze.calendar",
+    )
+    transform.assert_called_once_with(bronze_df)
+    write_silver_table.assert_called_once_with(
+        silver_df=silver_df,
+        output_table="orderflow_dev.silver.calendar",
+    )

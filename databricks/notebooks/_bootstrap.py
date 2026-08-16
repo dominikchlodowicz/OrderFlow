@@ -3,9 +3,28 @@
 # COMMAND ----------
 
 import sys
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+
+
+class VolumeToTableRunner(Protocol):
+    def __call__(
+        self,
+        *,
+        spark: Any,
+        input_path: str,
+        output_table: str,
+    ) -> None: ...
+
+
+class TableToTableRunner(Protocol):
+    def __call__(
+        self,
+        *,
+        spark: Any,
+        input_table: str,
+        output_table: str,
+    ) -> None: ...
 
 
 def add_project_src_to_pythonpath(dbutils: Any) -> str:
@@ -110,35 +129,45 @@ def bootstrap_databricks_notebook(
     )
 
 
-def run_databricks_pipeline_step(
+def run_databricks_volume_to_table_step(
     *,
     step_name: str,
-    runner: Callable[..., None],
+    runner: VolumeToTableRunner,
     spark: Any,
     input_path: str,
-    output_path: str,
+    output_table: str,
 ) -> None:
-    """
-    Runs a standard one-input / one-output pipeline step.
-
-    Example:
-        Bronze calendar:
-            raw path -> bronze path
-
-        Silver calendar:
-            bronze path -> silver path
-
-        Gold dim_calendar:
-            silver path -> gold path
-    """
+    """Run a Databricks landing-volume-to-catalog-table pipeline step."""
     print(f"Running {step_name}")
-    print(f"Input path:  {input_path}")
-    print(f"Output path: {output_path}")
+    print(f"Input path:   {input_path}")
+    print(f"Output table: {output_table}")
 
     runner(
         spark=spark,
         input_path=input_path,
-        output_path=output_path,
+        output_table=output_table,
+    )
+
+    print(f"{step_name} completed successfully.")
+
+
+def run_databricks_table_to_table_step(
+    *,
+    step_name: str,
+    runner: TableToTableRunner,
+    spark: Any,
+    input_table: str,
+    output_table: str,
+) -> None:
+    """Run a Databricks catalog-table-to-catalog-table pipeline step."""
+    print(f"Running {step_name}")
+    print(f"Input table:  {input_table}")
+    print(f"Output table: {output_table}")
+
+    runner(
+        spark=spark,
+        input_table=input_table,
+        output_table=output_table,
     )
 
     print(f"{step_name} completed successfully.")

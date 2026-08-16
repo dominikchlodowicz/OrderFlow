@@ -3,9 +3,13 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
-from orderflow.common.delta import read_delta, write_delta
+from orderflow.common.delta import (
+    read_delta,
+    read_delta_table,
+    write_delta,
+    write_delta_table,
+)
 from orderflow.common.validation import validate_required_columns
-
 
 DIM_CUSTOMERS_REQUIRED_COLUMNS = [
     "customer_id",
@@ -114,6 +118,18 @@ def write_dim_customers(
     )
 
 
+def write_dim_customers_table(
+    dim_customers_df: DataFrame,
+    output_table: str,
+) -> None:
+    write_delta_table(
+        df=dim_customers_df,
+        table_name=output_table,
+        mode="overwrite",
+        overwrite_schema=True,
+    )
+
+
 def run_dim_customers(
     spark: SparkSession,
     input_path: str | Path,
@@ -129,4 +145,22 @@ def run_dim_customers(
     write_dim_customers(
         dim_customers_df=dim_customers_df,
         output_path=output_path,
+    )
+
+
+def run_dim_customers_tables(
+    spark: SparkSession,
+    input_table: str,
+    output_table: str,
+) -> None:
+    silver_customers_df = read_delta_table(
+        spark=spark,
+        table_name=input_table,
+    )
+
+    dim_customers_df = transform_dim_customers(silver_customers_df)
+
+    write_dim_customers_table(
+        dim_customers_df=dim_customers_df,
+        output_table=output_table,
     )

@@ -1,9 +1,15 @@
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
 from pyspark.sql import DataFrame, SparkSession
 
-from orderflow.common.delta import read_delta, write_delta
+from orderflow.common.delta import (
+    read_delta,
+    read_delta_table,
+    write_delta,
+    write_delta_table,
+)
 
 
 def collect_rows(
@@ -333,3 +339,38 @@ def test_write_delta_creates_delta_transaction_log(
 
     assert delta_log_path.is_dir()
     assert any(delta_log_path.iterdir())
+
+
+def test_read_delta_table_uses_registered_table_name() -> None:
+    spark = Mock(spec=SparkSession)
+    expected_df = Mock(spec=DataFrame)
+    spark.table.return_value = expected_df
+
+    result_df = read_delta_table(
+        spark=spark,
+        table_name="orderflow_dev.silver.calendar",
+    )
+
+    assert result_df is expected_df
+    spark.table.assert_called_once_with("orderflow_dev.silver.calendar")
+
+
+def test_write_delta_table_uses_registered_table_name() -> None:
+    source_df = Mock(spec=DataFrame)
+    writer = source_df.write
+    writer.format.return_value = writer
+    writer.mode.return_value = writer
+    writer.option.return_value = writer
+    writer.partitionBy.return_value = writer
+
+    write_delta_table(
+        df=source_df,
+        table_name="orderflow_dev.bronze.calendar",
+        partition_by=["_source_load_date"],
+    )
+
+    writer.format.assert_called_once_with("delta")
+    writer.mode.assert_called_once_with("overwrite")
+    writer.option.assert_called_once_with("overwriteSchema", "true")
+    writer.partitionBy.assert_called_once_with("_source_load_date")
+    writer.saveAsTable.assert_called_once_with("orderflow_dev.bronze.calendar")

@@ -20,18 +20,18 @@ bootstrap_databricks_notebook(
 
 # COMMAND ----------
 
-from orderflow.bronze.customers import run_customers_bronze
+from orderflow.bronze.customers import run_customers_bronze_table
 from orderflow.config.constants import (
     CUSTOMERS_BRONZE_INPUT_PATH,
-    CUSTOMERS_BRONZE_OUTPUT_PATH,
+    CUSTOMERS_BRONZE_TABLE,
 )
 
 # COMMAND ----------
 
-run_databricks_pipeline_step(
+run_databricks_volume_to_table_step(
     step_name="Bronze customers ingestion",
-    runner=run_customers_bronze,
+    runner=run_customers_bronze_table,
     spark=spark,
     input_path=CUSTOMERS_BRONZE_INPUT_PATH,
-    output_path=CUSTOMERS_BRONZE_OUTPUT_PATH,
+    output_table=CUSTOMERS_BRONZE_TABLE,
 )
