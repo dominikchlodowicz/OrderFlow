@@ -1,10 +1,13 @@
 import csv
 import hashlib
+from datetime import date
 from pathlib import Path
+
+from helpers.constants import STANDARD_BRONZE_METADATA_COLUMNS
+from pyspark.sql import types as T
 
 from orderflow.bronze.calendar import CALENDAR_COLUMNS, run_calendar_bronze
 
-from helpers.constants import STANDARD_BRONZE_METADATA_COLUMNS
 
 def _calendar_row(
     *,
@@ -76,19 +79,20 @@ def test_run_calendar_bronze_writes_delta_table(spark, tmp_path: Path) -> None:
 
     assert result_df.count() == 1
 
-    assert set(result_df.columns) == set(CALENDAR_COLUMNS + STANDARD_BRONZE_METADATA_COLUMNS)
+    assert result_df.columns == CALENDAR_COLUMNS + STANDARD_BRONZE_METADATA_COLUMNS
+    assert isinstance(result_df.schema["_source_load_date"].dataType, T.DateType)
 
     row = result_df.first().asDict()
 
     for column_name, expected_value in expected_raw_row.items():
         assert row[column_name] == expected_value
 
-    assert row["_source_load_date"] == load_date
+    assert row["_source_load_date"] == date(2026, 5, 1)
     assert row["_source_file_name"] == f"calendar_{load_date}.csv"
     assert row["_source_file_path"].endswith(f"load_date={load_date}/calendar_{load_date}.csv")
     assert row["_source_system"] == "local_files"
     assert row["_source_entity"] == "calendar"
-    assert row["_ingestion_run_id"] == "manual-local-run"
+    assert row["_ingestion_run_id"]
     assert row["_ingested_at"] is not None
     assert row["_raw_record_hash"] == _expected_raw_record_hash(expected_raw_row)
 
@@ -148,7 +152,10 @@ def test_run_calendar_bronze_extracts_multiple_load_dates(
         for row in result_df.select("_source_load_date").distinct().collect()
     }
 
-    assert load_dates == {first_load_date, second_load_date}
+    assert load_dates == {
+        date.fromisoformat(first_load_date),
+        date.fromisoformat(second_load_date),
+    }
     assert result_df.count() == 2
 
 

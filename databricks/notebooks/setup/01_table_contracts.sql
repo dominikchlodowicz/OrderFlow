@@ -322,6 +322,32 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_calendar (
 )
 USING DELTA;
 
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_customers (
+  customer_id STRING NOT NULL COMMENT 'Source customer identifier',
+  email STRING NOT NULL,
+  first_name STRING NOT NULL,
+  last_name STRING NOT NULL,
+  country_code STRING NOT NULL COMMENT 'Uppercase ISO 3166-1 alpha-2 country code',
+  city STRING,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP COMMENT 'Must not precede created_at',
+  customer_status STRING NOT NULL COMMENT 'One of: active, inactive',
+  marketing_consent BOOLEAN NOT NULL,
+  load_date DATE,
+  loaded_at TIMESTAMP,
+  source_event_at TIMESTAMP,
+  _source_file_name STRING NOT NULL COMMENT 'Name of the physical source file containing the winning Bronze record',
+  _source_file_path STRING NOT NULL COMMENT 'Full physical path of the source file containing the winning Bronze record',
+  _ingestion_run_id STRING NOT NULL COMMENT 'Identifier of the Bronze ingestion run that introduced the winning record',
+  _bronze_ingested_at TIMESTAMP NOT NULL COMMENT 'UTC timestamp when the winning record was written to Bronze',
+  _raw_record_hash STRING NOT NULL COMMENT 'SHA-256 identifier of the exact raw source version selected for Silver',
+  _silver_processed_at TIMESTAMP NOT NULL COMMENT 'UTC timestamp when the row was produced in Silver',
+  -- DBML uniqueness (documentation only): UNIQUE (customer_id)
+  -- DBML uniqueness (documentation only): UNIQUE (email)
+  PRIMARY KEY (customer_id)
+)
+USING DELTA;
+
 CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_exchange_rate (
   exchange_rate_key BIGINT NOT NULL,
   rate_date_key STRING,

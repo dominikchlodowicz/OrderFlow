@@ -35,18 +35,11 @@ def add_project_src_to_pythonpath(dbutils: Any) -> str:
     is not installed as a wheel yet.
     """
     notebook_path = (
-        dbutils.notebook.entry_point
-        .getDbutils()
-        .notebook()
-        .getContext()
-        .notebookPath()
-        .get()
+        dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
     )
 
     if "/databricks/" not in notebook_path:
-        raise RuntimeError(
-            f"Could not infer repo root from notebook path: {notebook_path}"
-        )
+        raise RuntimeError(f"Could not infer repo root from notebook path: {notebook_path}")
 
     repo_workspace_path = notebook_path.split("/databricks/")[0]
 
@@ -59,9 +52,7 @@ def add_project_src_to_pythonpath(dbutils: Any) -> str:
     package_path = Path(src_path) / "orderflow"
 
     if not package_path.exists():
-        raise RuntimeError(
-            f"Could not find orderflow package at expected path: {package_path}"
-        )
+        raise RuntimeError(f"Could not find orderflow package at expected path: {package_path}")
 
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
@@ -122,11 +113,6 @@ def bootstrap_databricks_notebook(
     Standard setup for project Databricks notebooks.
     """
     add_project_src_to_pythonpath(dbutils)
-
-    configure_adls_shared_key_access(
-        spark=spark,
-        dbutils=dbutils,
-    )
 
 
 def run_databricks_volume_to_table_step(
@@ -205,18 +191,18 @@ def build_adls2_path(
     )
 
 
-def verify_delta_table(
+def verify_catalog_table(
     *,
     spark: Any,
-    path: str,
+    table_name: str,
     order_by: str | None = None,
 ) -> None:
     """
-    Quick Databricks helper for verifying a Delta table path.
+    Quick Databricks helper for verifying a Unity Catalog table.
     """
-    df = spark.read.format("delta").load(path)
+    df = spark.table(table_name)
 
-    print(f"Path: {path}")
+    print(f"Table: {table_name}")
     print(f"Row count: {df.count()}")
 
     df.printSchema()

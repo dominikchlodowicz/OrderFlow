@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import pytest
 from pyspark.sql import DataFrame, SparkSession
 
+from orderflow.config.constants import CALENDAR_BRONZE_TABLE, CALENDAR_SILVER_TABLE
 from orderflow.silver import common
 
 
@@ -102,17 +103,17 @@ def test_run_silver_table_pipeline_uses_registered_tables(
 
     common.run_silver_table_pipeline(
         spark=spark,
-        input_table="orderflow_dev.bronze.calendar",
-        output_table="orderflow_dev.silver.calendar",
+        input_table=CALENDAR_BRONZE_TABLE,
+        output_table=CALENDAR_SILVER_TABLE,
         transform=transform,
     )
 
     read_delta_table.assert_called_once_with(
         spark=spark,
-        table_name="orderflow_dev.bronze.calendar",
+        table_name=CALENDAR_BRONZE_TABLE,
     )
     transform.assert_called_once_with(bronze_df)
     write_silver_table.assert_called_once_with(
         silver_df=silver_df,
-        output_table="orderflow_dev.silver.calendar",
+        output_table=CALENDAR_SILVER_TABLE,
     )

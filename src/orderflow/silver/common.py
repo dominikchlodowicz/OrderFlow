@@ -42,7 +42,6 @@ def write_silver_table(
         df=silver_df,
         table_name=output_table,
         mode="overwrite",
-        overwrite_schema=True,
     )
 
 

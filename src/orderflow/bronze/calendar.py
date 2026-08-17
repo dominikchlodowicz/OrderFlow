@@ -1,11 +1,17 @@
 from pathlib import Path
+from uuid import uuid4
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import StringType, StructField, StructType
 
-from orderflow.bronze.common import add_standard_bronze_metadata
+from orderflow.bronze.common import (
+    add_standard_bronze_metadata,
+    select_bronze_contract_columns,
+    validate_bronze_dataframe,
+)
 from orderflow.common.delta import write_delta, write_delta_table
 from orderflow.common.validation import validate_required_columns
+from orderflow.config.constants import ADLS_SOURCE_SYSTEM
 
 CALENDAR_COLUMNS = [
     "date_day",
@@ -41,8 +47,7 @@ def read_calendar_raw(
     input_path: str | Path,
 ) -> DataFrame:
     raw_df = (
-        spark.read
-        .format("csv")
+        spark.read.format("csv")
         .schema(CALENDAR_SCHEMA)
         .option("header", "true")
         .option("recursiveFileLookup", "true")
@@ -61,6 +66,9 @@ def read_calendar_raw(
 def build_calendar_bronze(
     spark: SparkSession,
     input_path: str | Path,
+    *,
+    source_system: str = "local_files",
+    ingestion_run_id: str | None = None,
 ) -> DataFrame:
     raw_df = read_calendar_raw(
         spark=spark,
@@ -69,13 +77,19 @@ def build_calendar_bronze(
 
     bronze_df = add_standard_bronze_metadata(
         raw_df,
-        source_system="local_files",
+        source_system=source_system,
         source_entity="calendar",
-        ingestion_run_id="manual-local-run",
+        ingestion_run_id=ingestion_run_id or uuid4().hex,
         raw_columns=CALENDAR_COLUMNS,
     )
 
-    return bronze_df
+    contract_df = select_bronze_contract_columns(
+        bronze_df,
+        raw_columns=CALENDAR_COLUMNS,
+    )
+    validate_bronze_dataframe(contract_df, source_entity="calendar")
+
+    return contract_df
 
 
 def run_calendar_bronze(
@@ -105,12 +119,11 @@ def run_calendar_bronze_table(
     bronze_df = build_calendar_bronze(
         spark=spark,
         input_path=input_path,
+        source_system=ADLS_SOURCE_SYSTEM,
     )
 
     write_delta_table(
         df=bronze_df,
         table_name=output_table,
         mode="overwrite",
-        overwrite_schema=True,
-        partition_by=["_source_load_date"],
     )

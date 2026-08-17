@@ -11,7 +11,6 @@ from orderflow.gold.dim_calendar import (
     transform_dim_calendar,
 )
 
-
 SILVER_CALENDAR_SCHEMA = T.StructType(
     [
         T.StructField("date_day", T.DateType(), nullable=True),
@@ -29,10 +28,12 @@ SILVER_CALENDAR_SCHEMA = T.StructType(
             nullable=True,
         ),
         T.StructField("holiday_name", T.StringType(), nullable=True),
-
-        # Silver pipeline metadata that should not be copied to Gold.
-        T.StructField("source_load_date", T.DateType(), nullable=True),
-        T.StructField("source_loaded_at", T.TimestampType(), nullable=True),
+        # Silver lineage that should not be copied to Gold.
+        T.StructField("_source_file_name", T.StringType(), nullable=False),
+        T.StructField("_source_file_path", T.StringType(), nullable=False),
+        T.StructField("_ingestion_run_id", T.StringType(), nullable=False),
+        T.StructField("_bronze_ingested_at", T.TimestampType(), nullable=False),
+        T.StructField("_raw_record_hash", T.StringType(), nullable=False),
         T.StructField("_silver_processed_at", T.TimestampType(), nullable=True),
     ]
 )
@@ -82,8 +83,11 @@ def silver_calendar_row(
         "is_weekend": is_weekend,
         "is_polish_public_holiday": is_polish_public_holiday,
         "holiday_name": holiday_name,
-        "source_load_date": date(2026, 6, 1),
-        "source_loaded_at": datetime(2026, 6, 1, 1, 0, 0),
+        "_source_file_name": "calendar.csv",
+        "_source_file_path": "/Volumes/orderflow_dev/bronze/landing/calendar.csv",
+        "_ingestion_run_id": "run-001",
+        "_bronze_ingested_at": datetime(2026, 6, 1, 1, 0, 0),
+        "_raw_record_hash": "calendar-hash",
         "_silver_processed_at": datetime(2026, 6, 1, 1, 5, 0),
     }
 
@@ -108,23 +112,14 @@ def write_silver_calendar_delta(
         rows=rows,
     )
 
-    (
-        silver_df.write
-        .format("delta")
-        .mode("overwrite")
-        .save(str(path))
-    )
+    (silver_df.write.format("delta").mode("overwrite").save(str(path)))
 
 
 def read_gold_dim_calendar_delta(
     spark: SparkSession,
     path: Path,
 ) -> DataFrame:
-    return (
-        spark.read
-        .format("delta")
-        .load(str(path))
-    )
+    return spark.read.format("delta").load(str(path))
 
 
 def test_transform_dim_calendar_creates_analytical_columns(
@@ -166,8 +161,11 @@ def test_transform_dim_calendar_excludes_silver_metadata(
     result_df = transform_dim_calendar(silver_df)
 
     excluded_columns = {
-        "source_load_date",
-        "source_loaded_at",
+        "_source_file_name",
+        "_source_file_path",
+        "_ingestion_run_id",
+        "_bronze_ingested_at",
+        "_raw_record_hash",
         "_silver_processed_at",
     }
 
@@ -295,10 +293,7 @@ def test_run_dim_calendar_writes_delta_table(
     assert result_df.count() == 2
     assert result_df.columns == EXPECTED_GOLD_COLUMNS
 
-    result_by_key = {
-        row["date_key"]: row
-        for row in result_df.collect()
-    }
+    result_by_key = {row["date_key"]: row for row in result_df.collect()}
 
     assert set(result_by_key) == {
         20260601,
@@ -349,11 +344,6 @@ def test_run_dim_calendar_overwrites_existing_output_on_rerun(
 
     assert result_df.count() == 2
 
-    duplicate_key_count = (
-        result_df.groupBy("date_key")
-        .count()
-        .filter("count > 1")
-        .count()
-    )
+    duplicate_key_count = result_df.groupBy("date_key").count().filter("count > 1").count()
 
     assert duplicate_key_count == 0

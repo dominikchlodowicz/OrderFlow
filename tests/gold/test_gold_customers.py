@@ -11,7 +11,6 @@ from orderflow.gold.dim_customers import (
     transform_dim_customers,
 )
 
-
 SILVER_CUSTOMERS_SCHEMA = T.StructType(
     [
         T.StructField("customer_id", T.StringType(), nullable=True),
@@ -27,6 +26,11 @@ SILVER_CUSTOMERS_SCHEMA = T.StructType(
         T.StructField("load_date", T.DateType(), nullable=True),
         T.StructField("loaded_at", T.TimestampType(), nullable=True),
         T.StructField("source_event_at", T.TimestampType(), nullable=True),
+        T.StructField("_source_file_name", T.StringType(), nullable=False),
+        T.StructField("_source_file_path", T.StringType(), nullable=False),
+        T.StructField("_ingestion_run_id", T.StringType(), nullable=False),
+        T.StructField("_bronze_ingested_at", T.TimestampType(), nullable=False),
+        T.StructField("_raw_record_hash", T.StringType(), nullable=False),
         T.StructField("_silver_processed_at", T.TimestampType(), nullable=True),
     ]
 )
@@ -45,7 +49,7 @@ EXPECTED_GOLD_COLUMNS = [
     "is_active_customer",
     "marketing_consent",
     "registered_at",
-    "registration_date_key",
+    "registration_date",
     "_gold_processed_at",
 ]
 
@@ -60,7 +64,7 @@ def silver_customer_row(
     city: str = "Warszawa",
     created_at: datetime | None = datetime(2026, 6, 1, 8, 0, 0),
     customer_status: str = "active",
-    marketing_consent: bool = True,
+    marketing_consent: bool | None = True,
 ) -> dict[str, Any]:
     return {
         "customer_id": customer_id,
@@ -76,6 +80,11 @@ def silver_customer_row(
         "load_date": date(2026, 6, 2),
         "loaded_at": datetime(2026, 6, 2, 9, 0, 0),
         "source_event_at": datetime(2026, 6, 2, 8, 0, 0),
+        "_source_file_name": "customers.csv",
+        "_source_file_path": "/Volumes/orderflow_dev/bronze/landing/customers.csv",
+        "_ingestion_run_id": "run-001",
+        "_bronze_ingested_at": datetime(2026, 6, 2, 9, 0, 0),
+        "_raw_record_hash": "customers-hash",
         "_silver_processed_at": datetime(2026, 6, 2, 9, 5, 0),
     }
 
@@ -105,7 +114,7 @@ def test_transform_dim_customers_creates_analytical_columns(
     assert result["full_name"] == "Jan Kowalski"
     assert result["is_active_customer"] is True
     assert result["registered_at"] == datetime(2026, 6, 1, 8, 0, 0)
-    assert result["registration_date_key"] == 20260601
+    assert result["registration_date"] == date(2026, 6, 1)
     assert result["_gold_processed_at"] is not None
 
 
@@ -124,6 +133,11 @@ def test_transform_dim_customers_excludes_silver_metadata(
         "load_date",
         "loaded_at",
         "source_event_at",
+        "_source_file_name",
+        "_source_file_path",
+        "_ingestion_run_id",
+        "_bronze_ingested_at",
+        "_raw_record_hash",
         "_silver_processed_at",
     }
     assert excluded_columns.isdisjoint(result_df.columns)
@@ -197,6 +211,18 @@ def test_transform_dim_customers_rejects_null_customer_id(
     )
 
     with pytest.raises(ValueError, match="rows have null keys"):
+        transform_dim_customers(silver_df)
+
+
+def test_transform_dim_customers_rejects_null_required_attribute(
+    spark: SparkSession,
+) -> None:
+    silver_df = create_silver_customers_df(
+        spark,
+        [silver_customer_row(marketing_consent=None)],
+    )
+
+    with pytest.raises(ValueError, match="rows have null required attributes"):
         transform_dim_customers(silver_df)
 
 

@@ -33,9 +33,9 @@ def transform_dim_calendar(
     Converts the cleaned Silver calendar entity into an analytical
     Gold calendar dimension.
 
-    Gold intentionally excludes Silver pipeline metadata such as:
-        source_load_date
-        source_loaded_at
+    Gold intentionally excludes Silver lineage such as:
+        _source_file_name
+        _bronze_ingested_at
         _silver_processed_at
     """
     validate_required_columns(
@@ -79,28 +79,14 @@ def transform_dim_calendar(
 def validate_dim_calendar(
     df: DataFrame,
 ) -> None:
-    null_key_count = (
-        df.filter(
-            F.col("date_key").isNull()
-            | F.col("date_day").isNull()
-        )
-        .count()
-    )
+    null_key_count = df.filter(F.col("date_key").isNull() | F.col("date_day").isNull()).count()
 
     if null_key_count > 0:
         raise ValueError(
-            "dim_calendar validation failed: "
-            f"{null_key_count} rows have null keys."
+            "dim_calendar validation failed: " f"{null_key_count} rows have null keys."
         )
 
-    duplicate_key_count = (
-        df.groupBy("date_key")
-        .count()
-        .filter(
-            F.col("count") > 1
-        )
-        .count()
-    )
+    duplicate_key_count = df.groupBy("date_key").count().filter(F.col("count") > 1).count()
 
     if duplicate_key_count > 0:
         raise ValueError(
@@ -129,7 +115,6 @@ def write_dim_calendar_table(
         df=dim_calendar_df,
         table_name=output_table,
         mode="overwrite",
-        overwrite_schema=True,
     )
 
 
@@ -143,9 +128,7 @@ def run_dim_calendar(
         path=input_path,
     )
 
-    dim_calendar_df = transform_dim_calendar(
-        silver_calendar_df
-    )
+    dim_calendar_df = transform_dim_calendar(silver_calendar_df)
 
     write_dim_calendar(
         dim_calendar_df=dim_calendar_df,
@@ -163,9 +146,7 @@ def run_dim_calendar_tables(
         table_name=input_table,
     )
 
-    dim_calendar_df = transform_dim_calendar(
-        silver_calendar_df
-    )
+    dim_calendar_df = transform_dim_calendar(silver_calendar_df)
 
     write_dim_calendar_table(
         dim_calendar_df=dim_calendar_df,
