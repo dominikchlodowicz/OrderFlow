@@ -60,25 +60,6 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.customers (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.exchange_rate (
-  rate_date STRING,
-  currency STRING,
-  rate_to_pln STRING,
-  source STRING,
-  load_date STRING,
-  loaded_at STRING,
-  source_event_at STRING,
-  _source_system STRING NOT NULL COMMENT 'System that produced the source data',
-  _source_entity STRING NOT NULL COMMENT 'Source dataset or entity name',
-  _source_file_name STRING NOT NULL COMMENT 'Name of the physical source file',
-  _source_load_date DATE NOT NULL COMMENT 'Delivery or partition date assigned by the ingestion convention',
-  _source_file_path STRING NOT NULL COMMENT 'Full physical path of the source file',
-  _ingestion_run_id STRING NOT NULL COMMENT 'Identifier shared by all rows processed in the same Bronze ingestion run',
-  _ingested_at TIMESTAMP NOT NULL COMMENT 'UTC timestamp when the row was written to Bronze',
-  _raw_record_hash STRING NOT NULL COMMENT 'SHA-256 hash of the ordered raw source fields, excluding ingestion metadata'
-)
-USING DELTA;
-
 CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.marketing_campaigns (
   campaign_id STRING,
   campaign_name STRING,
@@ -345,24 +326,6 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.customers (
   -- DBML uniqueness (documentation only): UNIQUE (customer_id)
   -- DBML uniqueness (documentation only): UNIQUE (email)
   PRIMARY KEY (customer_id)
-)
-USING DELTA;
-
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.exchange_rate (
-  exchange_rate_key BIGINT NOT NULL,
-  rate_date_key STRING,
-  rate_date DATE,
-  currency STRING,
-  rate_to_pln DECIMAL(5, 4),
-  source STRING,
-  loaded_at TIMESTAMP,
-  _source_file_name STRING NOT NULL COMMENT 'Name of the physical source file containing the winning Bronze record',
-  _source_file_path STRING NOT NULL COMMENT 'Full physical path of the source file containing the winning Bronze record',
-  _ingestion_run_id STRING NOT NULL COMMENT 'Identifier of the Bronze ingestion run that introduced the winning record',
-  _bronze_ingested_at TIMESTAMP NOT NULL COMMENT 'UTC timestamp when the winning record was written to Bronze',
-  _raw_record_hash STRING NOT NULL COMMENT 'SHA-256 identifier of the exact raw source version selected for Silver',
-  _silver_processed_at TIMESTAMP NOT NULL COMMENT 'UTC timestamp when the row was produced in Silver',
-  PRIMARY KEY (exchange_rate_key)
 )
 USING DELTA;
 

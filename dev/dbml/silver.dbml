@@ -41,18 +41,6 @@ Table silver_customers {
   ~silver_lineage
 }
 
-Table silver_exchange_rate {
-  exchange_rate_key bigint [pk, not null]
-  rate_date_key varchar
-  rate_date date
-  currency varchar
-  rate_to_pln decimal(5, 4)
-  source varchar
-  loaded_at timestamp
-
-  ~silver_lineage
-}
-
 Table silver_order_items {
   order_item_id varchar [pk, not null, unique]
   order_id varchar [not null]

@@ -45,18 +45,6 @@ Table bronze_customers {
   ~bronze_lineage
 }
 
-Table bronze_exchange_rate {
-  rate_date varchar
-  currency varchar
-  rate_to_pln varchar
-  source varchar
-  load_date varchar
-  loaded_at varchar
-  source_event_at varchar
-
-  ~bronze_lineage
-}
-
 Table bronze_marketing_campaigns {
   campaign_id varchar
   campaign_name varchar
