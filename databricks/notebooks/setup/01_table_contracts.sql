@@ -720,13 +720,13 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.gold.fct_order_items (
   line_total DECIMAL(18, 2) NOT NULL COMMENT 'gross_amount - discount_amount',
   _gold_processed_at TIMESTAMP NOT NULL COMMENT 'UTC timestamp when the row was produced or refreshed in Gold',
   -- DBML uniqueness (documentation only): UNIQUE (order_item_id)
-  PRIMARY KEY (order_item_key),
-  FOREIGN KEY (customer_key) REFERENCES orderflow_dev.gold.dim_customers (customer_key),
-  FOREIGN KEY (product_key) REFERENCES orderflow_dev.gold.dim_products (product_key),
-  FOREIGN KEY (campaign_key) REFERENCES orderflow_dev.gold.dim_campaigns (campaign_key),
-  FOREIGN KEY (currency_key) REFERENCES orderflow_dev.gold.dim_currency (currency_key),
-  FOREIGN KEY (order_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
-  FOREIGN KEY (order_item_created_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key)
+  CONSTRAINT pk_fct_order_items PRIMARY KEY (order_item_key),
+  CONSTRAINT fk_fct_order_items_customer FOREIGN KEY (customer_key) REFERENCES orderflow_dev.gold.dim_customers (customer_key),
+  CONSTRAINT fk_fct_order_items_product FOREIGN KEY (product_key) REFERENCES orderflow_dev.gold.dim_products (product_key),
+  CONSTRAINT fk_fct_order_items_campaign FOREIGN KEY (campaign_key) REFERENCES orderflow_dev.gold.dim_campaigns (campaign_key),
+  CONSTRAINT fk_fct_order_items_currency FOREIGN KEY (currency_key) REFERENCES orderflow_dev.gold.dim_currency (currency_key),
+  CONSTRAINT fk_fct_order_items_order_date FOREIGN KEY (order_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
+  CONSTRAINT fk_fct_order_items_created_date FOREIGN KEY (order_item_created_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key)
 )
 USING DELTA
 COMMENT 'Grain: one accepted order item per order_item_id. Customer, campaign, currency, country, and order-date context is enriched from the accepted order header.';
@@ -753,8 +753,8 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.gold.fct_payments (
   FOREIGN KEY (customer_key) REFERENCES orderflow_dev.gold.dim_customers (customer_key),
   FOREIGN KEY (campaign_key) REFERENCES orderflow_dev.gold.dim_campaigns (campaign_key),
   FOREIGN KEY (currency_key) REFERENCES orderflow_dev.gold.dim_currency (currency_key),
-  FOREIGN KEY (payment_created_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
-  FOREIGN KEY (payment_processed_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key)
+  CONSTRAINT fk_fct_payments_created_date FOREIGN KEY (payment_created_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
+  CONSTRAINT fk_fct_payments_processed_date FOREIGN KEY (payment_processed_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key)
 )
 USING DELTA
 COMMENT 'Grain: one latest accepted payment per payment_id. Current-state payment fact.';
@@ -780,8 +780,8 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.gold.fct_refunds (
   FOREIGN KEY (customer_key) REFERENCES orderflow_dev.gold.dim_customers (customer_key),
   FOREIGN KEY (campaign_key) REFERENCES orderflow_dev.gold.dim_campaigns (campaign_key),
   FOREIGN KEY (currency_key) REFERENCES orderflow_dev.gold.dim_currency (currency_key),
-  FOREIGN KEY (refund_created_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
-  FOREIGN KEY (refund_processed_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key)
+  CONSTRAINT fk_fct_refunds_created_date FOREIGN KEY (refund_created_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
+  CONSTRAINT fk_fct_refunds_processed_date FOREIGN KEY (refund_processed_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key)
 )
 USING DELTA
 COMMENT 'Grain: one latest accepted refund per refund_id. Current-state refund fact.';
@@ -807,9 +807,9 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.gold.fct_shipments (
   PRIMARY KEY (shipment_key),
   FOREIGN KEY (customer_key) REFERENCES orderflow_dev.gold.dim_customers (customer_key),
   FOREIGN KEY (campaign_key) REFERENCES orderflow_dev.gold.dim_campaigns (campaign_key),
-  FOREIGN KEY (shipped_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
-  FOREIGN KEY (estimated_delivery_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
-  FOREIGN KEY (delivered_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key)
+  CONSTRAINT fk_fct_shipments_shipped_date FOREIGN KEY (shipped_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
+  CONSTRAINT fk_fct_shipments_estimated_date FOREIGN KEY (estimated_delivery_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key),
+  CONSTRAINT fk_fct_shipments_delivered_date FOREIGN KEY (delivered_date_key) REFERENCES orderflow_dev.gold.dim_calendar (date_key)
 )
 USING DELTA
 COMMENT 'Grain: one latest accepted shipment per shipment_id. Current-state/accumulating-snapshot fact.';
