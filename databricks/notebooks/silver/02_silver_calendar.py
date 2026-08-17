@@ -20,18 +20,18 @@ bootstrap_databricks_notebook(
 
 # COMMAND ----------
 
-from orderflow.silver.calendar import run_calendar_silver
 from orderflow.config.constants import (
-    CALENDAR_SILVER_INPUT_PATH,
-    CALENDAR_SILVER_OUTPUT_PATH,
+    CALENDAR_BRONZE_TABLE,
+    CALENDAR_SILVER_TABLE,
 )
+from orderflow.silver.calendar import run_calendar_silver_tables
 
 # COMMAND ----------
 
-run_databricks_pipeline_step(
+run_databricks_table_to_table_step(
     step_name="Silver calendar transformation",
-    runner=run_calendar_silver,
+    runner=run_calendar_silver_tables,
     spark=spark,
-    input_path=CALENDAR_SILVER_INPUT_PATH,
-    output_path=CALENDAR_SILVER_OUTPUT_PATH,
+    input_table=CALENDAR_BRONZE_TABLE,
+    output_table=CALENDAR_SILVER_TABLE,
 )

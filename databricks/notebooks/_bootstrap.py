@@ -3,9 +3,28 @@
 # COMMAND ----------
 
 import sys
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+
+
+class VolumeToTableRunner(Protocol):
+    def __call__(
+        self,
+        *,
+        spark: Any,
+        input_path: str,
+        output_table: str,
+    ) -> None: ...
+
+
+class TableToTableRunner(Protocol):
+    def __call__(
+        self,
+        *,
+        spark: Any,
+        input_table: str,
+        output_table: str,
+    ) -> None: ...
 
 
 def add_project_src_to_pythonpath(dbutils: Any) -> str:
@@ -16,18 +35,11 @@ def add_project_src_to_pythonpath(dbutils: Any) -> str:
     is not installed as a wheel yet.
     """
     notebook_path = (
-        dbutils.notebook.entry_point
-        .getDbutils()
-        .notebook()
-        .getContext()
-        .notebookPath()
-        .get()
+        dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
     )
 
     if "/databricks/" not in notebook_path:
-        raise RuntimeError(
-            f"Could not infer repo root from notebook path: {notebook_path}"
-        )
+        raise RuntimeError(f"Could not infer repo root from notebook path: {notebook_path}")
 
     repo_workspace_path = notebook_path.split("/databricks/")[0]
 
@@ -40,9 +52,7 @@ def add_project_src_to_pythonpath(dbutils: Any) -> str:
     package_path = Path(src_path) / "orderflow"
 
     if not package_path.exists():
-        raise RuntimeError(
-            f"Could not find orderflow package at expected path: {package_path}"
-        )
+        raise RuntimeError(f"Could not find orderflow package at expected path: {package_path}")
 
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
@@ -104,41 +114,46 @@ def bootstrap_databricks_notebook(
     """
     add_project_src_to_pythonpath(dbutils)
 
-    configure_adls_shared_key_access(
-        spark=spark,
-        dbutils=dbutils,
-    )
 
-
-def run_databricks_pipeline_step(
+def run_databricks_volume_to_table_step(
     *,
     step_name: str,
-    runner: Callable[..., None],
+    runner: VolumeToTableRunner,
     spark: Any,
     input_path: str,
-    output_path: str,
+    output_table: str,
 ) -> None:
-    """
-    Runs a standard one-input / one-output pipeline step.
-
-    Example:
-        Bronze calendar:
-            raw path -> bronze path
-
-        Silver calendar:
-            bronze path -> silver path
-
-        Gold dim_calendar:
-            silver path -> gold path
-    """
+    """Run a Databricks landing-volume-to-catalog-table pipeline step."""
     print(f"Running {step_name}")
-    print(f"Input path:  {input_path}")
-    print(f"Output path: {output_path}")
+    print(f"Input path:   {input_path}")
+    print(f"Output table: {output_table}")
 
     runner(
         spark=spark,
         input_path=input_path,
-        output_path=output_path,
+        output_table=output_table,
+    )
+
+    print(f"{step_name} completed successfully.")
+
+
+def run_databricks_table_to_table_step(
+    *,
+    step_name: str,
+    runner: TableToTableRunner,
+    spark: Any,
+    input_table: str,
+    output_table: str,
+) -> None:
+    """Run a Databricks catalog-table-to-catalog-table pipeline step."""
+    print(f"Running {step_name}")
+    print(f"Input table:  {input_table}")
+    print(f"Output table: {output_table}")
+
+    runner(
+        spark=spark,
+        input_table=input_table,
+        output_table=output_table,
     )
 
     print(f"{step_name} completed successfully.")
@@ -176,18 +191,18 @@ def build_adls2_path(
     )
 
 
-def verify_delta_table(
+def verify_catalog_table(
     *,
     spark: Any,
-    path: str,
+    table_name: str,
     order_by: str | None = None,
 ) -> None:
     """
-    Quick Databricks helper for verifying a Delta table path.
+    Quick Databricks helper for verifying a Unity Catalog table.
     """
-    df = spark.read.format("delta").load(path)
+    df = spark.table(table_name)
 
-    print(f"Path: {path}")
+    print(f"Table: {table_name}")
     print(f"Row count: {df.count()}")
 
     df.printSchema()

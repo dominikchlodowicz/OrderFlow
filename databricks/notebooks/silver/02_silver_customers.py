@@ -20,18 +20,18 @@ bootstrap_databricks_notebook(
 
 # COMMAND ----------
 
-from orderflow.silver.customers import run_customers_silver
 from orderflow.config.constants import (
-    CUSTOMERS_SILVER_INPUT_PATH,
-    CUSTOMERS_SILVER_OUTPUT_PATH,
+    CUSTOMERS_BRONZE_TABLE,
+    CUSTOMERS_SILVER_TABLE,
 )
+from orderflow.silver.customers import run_customers_silver_tables
 
 # COMMAND ----------
 
-run_databricks_pipeline_step(
+run_databricks_table_to_table_step(
     step_name="Silver customers transformation",
-    runner=run_customers_silver,
+    runner=run_customers_silver_tables,
     spark=spark,
-    input_path=CUSTOMERS_SILVER_INPUT_PATH,
-    output_path=CUSTOMERS_SILVER_OUTPUT_PATH,
+    input_table=CUSTOMERS_BRONZE_TABLE,
+    output_table=CUSTOMERS_SILVER_TABLE,
 )

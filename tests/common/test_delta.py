@@ -1,9 +1,26 @@
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
+import pytest
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import types as T
 
-from orderflow.common.delta import read_delta, write_delta
+from orderflow.common.delta import (
+    align_dataframe_to_table_contract,
+    read_delta,
+    read_delta_table,
+    write_delta,
+    write_delta_table,
+)
+from orderflow.config.constants import (
+    CALENDAR_BRONZE_TABLE,
+    CALENDAR_GOLD_TABLE,
+    CALENDAR_SILVER_TABLE,
+    CUSTOMERS_BRONZE_TABLE,
+    CUSTOMERS_GOLD_TABLE,
+    CUSTOMERS_SILVER_TABLE,
+)
 
 
 def collect_rows(
@@ -11,10 +28,7 @@ def collect_rows(
     *,
     order_by: str,
 ) -> list[dict[str, Any]]:
-    return [
-        row.asDict(recursive=True)
-        for row in df.orderBy(order_by).collect()
-    ]
+    return [row.asDict(recursive=True) for row in df.orderBy(order_by).collect()]
 
 
 def test_write_and_read_delta_round_trip(
@@ -248,8 +262,7 @@ def test_write_delta_partitions_table_by_selected_column(
     assert result_df.count() == 3
 
     entity_types = {
-        row["entity_type"]
-        for row in result_df.select("entity_type").distinct().collect()
+        row["entity_type"] for row in result_df.select("entity_type").distinct().collect()
     }
 
     assert entity_types == {
@@ -258,9 +271,7 @@ def test_write_delta_partitions_table_by_selected_column(
     }
 
     partition_directories = {
-        path.name
-        for path in output_path.glob("entity_type=*")
-        if path.is_dir()
+        path.name for path in output_path.glob("entity_type=*") if path.is_dir()
     }
 
     assert partition_directories == {
@@ -333,3 +344,111 @@ def test_write_delta_creates_delta_transaction_log(
 
     assert delta_log_path.is_dir()
     assert any(delta_log_path.iterdir())
+
+
+def test_read_delta_table_uses_registered_table_name() -> None:
+    spark = Mock(spec=SparkSession)
+    expected_df = Mock(spec=DataFrame)
+    spark.table.return_value = expected_df
+
+    result_df = read_delta_table(
+        spark=spark,
+        table_name=CALENDAR_SILVER_TABLE,
+    )
+
+    assert result_df is expected_df
+    spark.table.assert_called_once_with(CALENDAR_SILVER_TABLE)
+
+
+def test_write_delta_table_aligns_to_registered_contract_and_preserves_table() -> None:
+    source_df = Mock(spec=DataFrame)
+    aligned_df = Mock(spec=DataFrame)
+    writer = aligned_df.write
+    writer.mode.return_value = writer
+    spark = Mock(spec=SparkSession)
+    target_df = Mock(spec=DataFrame)
+    target_schema = T.StructType(
+        [
+            T.StructField("id", T.IntegerType()),
+            T.StructField("entity_name", T.StringType()),
+        ]
+    )
+    source_df.sparkSession = spark
+    source_df.columns = ["entity_name", "id"]
+    source_df.schema = T.StructType(
+        [
+            T.StructField("entity_name", T.StringType()),
+            T.StructField("id", T.IntegerType()),
+        ]
+    )
+    source_df.select.return_value = aligned_df
+    target_df.schema = target_schema
+    spark.table.return_value = target_df
+
+    write_delta_table(
+        df=source_df,
+        table_name=CALENDAR_BRONZE_TABLE,
+    )
+
+    spark.table.assert_called_once_with(CALENDAR_BRONZE_TABLE)
+    source_df.select.assert_called_once_with("id", "entity_name")
+    writer.mode.assert_called_once_with("overwrite")
+    writer.insertInto.assert_called_once_with(CALENDAR_BRONZE_TABLE)
+
+
+def test_align_dataframe_to_table_contract_rejects_column_drift() -> None:
+    source_df = Mock(spec=DataFrame)
+    spark = Mock(spec=SparkSession)
+    target_df = Mock(spec=DataFrame)
+    source_df.sparkSession = spark
+    source_df.columns = ["id", "unexpected"]
+    source_df.schema = T.StructType(
+        [
+            T.StructField("id", T.IntegerType()),
+            T.StructField("unexpected", T.StringType()),
+        ]
+    )
+    target_df.schema = T.StructType(
+        [
+            T.StructField("id", T.IntegerType()),
+            T.StructField("entity_name", T.StringType()),
+        ]
+    )
+    spark.table.return_value = target_df
+
+    with pytest.raises(
+        ValueError, match="missing columns=.*entity_name.*extra columns=.*unexpected"
+    ):
+        align_dataframe_to_table_contract(source_df, CALENDAR_BRONZE_TABLE)
+
+
+def test_align_dataframe_to_table_contract_rejects_type_drift() -> None:
+    source_df = Mock(spec=DataFrame)
+    spark = Mock(spec=SparkSession)
+    target_df = Mock(spec=DataFrame)
+    source_df.sparkSession = spark
+    source_df.columns = ["id"]
+    source_df.schema = T.StructType([T.StructField("id", T.StringType())])
+    target_df.schema = T.StructType([T.StructField("id", T.IntegerType())])
+    spark.table.return_value = target_df
+
+    with pytest.raises(ValueError, match="id: DataFrame=string, table=int"):
+        align_dataframe_to_table_contract(source_df, CALENDAR_BRONZE_TABLE)
+
+
+@pytest.mark.parametrize(
+    ("actual_table", "contract_table"),
+    [
+        (CALENDAR_BRONZE_TABLE, "orderflow_dev.bronze.calendar"),
+        (CUSTOMERS_BRONZE_TABLE, "orderflow_dev.bronze.customers"),
+        (CALENDAR_SILVER_TABLE, "orderflow_dev.silver.calendar"),
+        (CUSTOMERS_SILVER_TABLE, "orderflow_dev.silver.customers"),
+        (CALENDAR_GOLD_TABLE, "orderflow_dev.gold.dim_calendar"),
+        (CUSTOMERS_GOLD_TABLE, "orderflow_dev.gold.dim_customers"),
+    ],
+)
+def test_unity_catalog_table_constants_match_contracts(
+    actual_table: str,
+    contract_table: str,
+) -> None:
+    assert actual_table == contract_table

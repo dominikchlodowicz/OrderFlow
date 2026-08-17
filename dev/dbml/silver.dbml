@@ -23,14 +23,20 @@ Table silver_calendar {
   ~silver_lineage
 }
 
-Table silver_exchange_rate {
-  exchange_rate_key bigint [pk, not null]
-  rate_date_key varchar
-  rate_date date
-  currency varchar
-  rate_to_pln decimal(5, 4)
-  source varchar
+Table silver_customers {
+  customer_id varchar [pk, not null, unique, note: 'Source customer identifier']
+  email varchar [not null, unique]
+  first_name varchar [not null]
+  last_name varchar [not null]
+  country_code varchar [not null, note: 'Uppercase ISO 3166-1 alpha-2 country code']
+  city varchar
+  created_at timestamp
+  updated_at timestamp [note: 'Must not precede created_at']
+  customer_status varchar [not null, note: 'One of: active, inactive']
+  marketing_consent boolean [not null]
+  load_date date
   loaded_at timestamp
+  source_event_at timestamp
 
   ~silver_lineage
 }

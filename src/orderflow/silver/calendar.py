@@ -4,7 +4,11 @@ from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from orderflow.common.validation import validate_required_columns
-from orderflow.silver.common import run_silver_pipeline, write_silver
+from orderflow.silver.common import (
+    run_silver_pipeline,
+    run_silver_table_pipeline,
+    write_silver,
+)
 
 CALENDAR_REQUIRED_COLUMNS = [
     "date_day",
@@ -17,8 +21,15 @@ CALENDAR_REQUIRED_COLUMNS = [
     "week_of_year",
     "is_weekend",
     "is_polish_public_holiday",
+    "holiday_name",
     "load_date",
     "loaded_at",
+    "_source_file_name",
+    "_source_file_path",
+    "_source_load_date",
+    "_ingestion_run_id",
+    "_ingested_at",
+    "_raw_record_hash",
 ]
 
 
@@ -28,18 +39,14 @@ def normalize_blank_to_null(
     return F.when(
         F.trim(F.col(column_name)) == "",
         F.lit(None),
-    ).otherwise(
-        F.trim(F.col(column_name))
-    )
+    ).otherwise(F.trim(F.col(column_name)))
 
 
 def try_cast_column(
     column_name: str,
     target_type: str,
 ) -> Column:
-    return F.expr(
-        f"try_cast(`{column_name}` as {target_type})"
-    )
+    return F.expr(f"try_cast(`{column_name}` as {target_type})")
 
 
 def transform_calendar_silver(
@@ -51,85 +58,79 @@ def transform_calendar_silver(
         dataset_name="Bronze calendar",
     )
 
-    silver_df = (
-        bronze_df
-        .select(
-            try_cast_column(
-                "date_day",
-                "date",
-            ).alias("date_day"),
-            try_cast_column(
-                "year",
-                "int",
-            ).alias("year"),
-            try_cast_column(
-                "quarter",
-                "int",
-            ).alias("quarter"),
-            try_cast_column(
-                "month",
-                "int",
-            ).alias("month"),
-            try_cast_column(
-                "day_of_month",
-                "int",
-            ).alias("day_of_month"),
-            try_cast_column(
-                "day_of_week",
-                "int",
-            ).alias("day_of_week"),
-            normalize_blank_to_null(
-                "day_name",
-            ).alias("day_name"),
-            try_cast_column(
-                "week_of_year",
-                "int",
-            ).alias("week_of_year"),
-            try_cast_column(
-                "is_weekend",
-                "boolean",
-            ).alias("is_weekend"),
-            try_cast_column(
-                "is_polish_public_holiday",
-                "boolean",
-            ).alias("is_polish_public_holiday"),
-            normalize_blank_to_null(
-                "holiday_name",
-            ).alias("holiday_name"),
-            try_cast_column(
-                "load_date",
-                "date",
-            ).alias("source_load_date"),
-            try_cast_column(
-                "loaded_at",
-                "timestamp",
-            ).alias("source_loaded_at"),
-        )
-        .withColumn(
-            "_silver_processed_at",
-            F.current_timestamp(),
-        )
+    silver_df = bronze_df.select(
+        try_cast_column(
+            "date_day",
+            "date",
+        ).alias("date_day"),
+        try_cast_column(
+            "year",
+            "int",
+        ).alias("year"),
+        try_cast_column(
+            "quarter",
+            "int",
+        ).alias("quarter"),
+        try_cast_column(
+            "month",
+            "int",
+        ).alias("month"),
+        try_cast_column(
+            "day_of_month",
+            "int",
+        ).alias("day_of_month"),
+        try_cast_column(
+            "day_of_week",
+            "int",
+        ).alias("day_of_week"),
+        normalize_blank_to_null(
+            "day_name",
+        ).alias("day_name"),
+        try_cast_column(
+            "week_of_year",
+            "int",
+        ).alias("week_of_year"),
+        try_cast_column(
+            "is_weekend",
+            "boolean",
+        ).alias("is_weekend"),
+        try_cast_column(
+            "is_polish_public_holiday",
+            "boolean",
+        ).alias("is_polish_public_holiday"),
+        normalize_blank_to_null(
+            "holiday_name",
+        ).alias("holiday_name"),
+        F.col("_source_file_name"),
+        F.col("_source_file_path"),
+        F.col("_ingestion_run_id"),
+        F.col("_ingested_at").alias("_bronze_ingested_at"),
+        F.col("_raw_record_hash"),
+        F.col("_source_load_date").alias("_dedupe_load_date"),
+        try_cast_column("loaded_at", "timestamp").alias("_dedupe_loaded_at"),
+    ).withColumn(
+        "_silver_processed_at",
+        F.current_timestamp(),
     )
 
-    latest_row_per_date = (
-        Window
-        .partitionBy("date_day")
-        .orderBy(
-            F.col("source_loaded_at").desc_nulls_last(),
-            F.col("source_load_date").desc_nulls_last(),
-        )
+    latest_row_per_date = Window.partitionBy("date_day").orderBy(
+        F.col("_dedupe_loaded_at").desc_nulls_last(),
+        F.col("_dedupe_load_date").desc_nulls_last(),
+        F.col("_bronze_ingested_at").desc_nulls_last(),
+        F.col("_raw_record_hash").desc(),
     )
 
     silver_df = (
-        silver_df
-        .withColumn(
+        silver_df.withColumn(
             "_row_number",
             F.row_number().over(latest_row_per_date),
         )
-        .filter(
-            F.col("_row_number") == 1
+        .filter(F.col("_row_number") == 1)
+        .drop(
+            "_row_number",
+            "_dedupe_load_date",
+            "_dedupe_loaded_at",
         )
-        .drop("_row_number")
     )
 
     validate_calendar_silver(silver_df)
@@ -140,23 +141,24 @@ def transform_calendar_silver(
 def validate_calendar_silver(
     df: DataFrame,
 ) -> None:
-    invalid_required_rows = (
-        df.filter(
-            F.col("date_day").isNull()
-            | F.col("year").isNull()
-            | F.col("quarter").isNull()
-            | F.col("month").isNull()
-            | F.col("day_of_month").isNull()
-            | F.col("day_of_week").isNull()
-            | F.col("day_name").isNull()
-            | F.col("week_of_year").isNull()
-            | F.col("is_weekend").isNull()
-            | F.col("is_polish_public_holiday").isNull()
-            | F.col("source_load_date").isNull()
-            | F.col("source_loaded_at").isNull()
-        )
-        .count()
-    )
+    invalid_required_rows = df.filter(
+        F.col("date_day").isNull()
+        | F.col("year").isNull()
+        | F.col("quarter").isNull()
+        | F.col("month").isNull()
+        | F.col("day_of_month").isNull()
+        | F.col("day_of_week").isNull()
+        | F.col("day_name").isNull()
+        | F.col("week_of_year").isNull()
+        | F.col("is_weekend").isNull()
+        | F.col("is_polish_public_holiday").isNull()
+        | F.col("_source_file_name").isNull()
+        | F.col("_source_file_path").isNull()
+        | F.col("_ingestion_run_id").isNull()
+        | F.col("_bronze_ingested_at").isNull()
+        | F.col("_raw_record_hash").isNull()
+        | F.col("_silver_processed_at").isNull()
+    ).count()
 
     if invalid_required_rows > 0:
         raise ValueError(
@@ -164,16 +166,13 @@ def validate_calendar_silver(
             f"{invalid_required_rows} rows have null required fields."
         )
 
-    invalid_domain_rows = (
-        df.filter(
-            ~F.col("quarter").between(1, 4)
-            | ~F.col("month").between(1, 12)
-            | ~F.col("day_of_month").between(1, 31)
-            | ~F.col("day_of_week").between(1, 7)
-            | ~F.col("week_of_year").between(1, 53)
-        )
-        .count()
-    )
+    invalid_domain_rows = df.filter(
+        ~F.col("quarter").between(1, 4)
+        | ~F.col("month").between(1, 12)
+        | ~F.col("day_of_month").between(1, 31)
+        | ~F.col("day_of_week").between(1, 7)
+        | ~F.col("week_of_year").between(1, 53)
+    ).count()
 
     if invalid_domain_rows > 0:
         raise ValueError(
@@ -181,14 +180,7 @@ def validate_calendar_silver(
             f"{invalid_domain_rows} rows have invalid calendar values."
         )
 
-    duplicate_date_rows = (
-        df.groupBy("date_day")
-        .count()
-        .filter(
-            F.col("count") > 1
-        )
-        .count()
-    )
+    duplicate_date_rows = df.groupBy("date_day").count().filter(F.col("count") > 1).count()
 
     if duplicate_date_rows > 0:
         raise ValueError(
@@ -216,5 +208,18 @@ def run_calendar_silver(
         spark=spark,
         input_path=input_path,
         output_path=output_path,
+        transform=transform_calendar_silver,
+    )
+
+
+def run_calendar_silver_tables(
+    spark: SparkSession,
+    input_table: str,
+    output_table: str,
+) -> None:
+    run_silver_table_pipeline(
+        spark=spark,
+        input_table=input_table,
+        output_table=output_table,
         transform=transform_calendar_silver,
     )

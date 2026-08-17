@@ -220,6 +220,7 @@ __marimo__/
 # Helper notes
 TODO.md
 commands.md
+unitycatalog.md
 
 # local data for local spark development
 data/raw/*

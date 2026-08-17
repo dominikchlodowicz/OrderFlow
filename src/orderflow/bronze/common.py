@@ -1,13 +1,26 @@
 # reusable bronze infra
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
-from typing import Iterable
 
 from delta.tables import DeltaTable
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+
+BRONZE_LINEAGE_COLUMNS = [
+    "_source_system",
+    "_source_entity",
+    "_source_file_name",
+    "_source_load_date",
+    "_source_file_path",
+    "_ingestion_run_id",
+    "_ingested_at",
+    "_raw_record_hash",
+]
+
 
 @dataclass(frozen=True)
 class BronzeWriteConfig:
@@ -17,8 +30,8 @@ class BronzeWriteConfig:
     source_entity: str
     ingestion_run_id: str
 
-
     FILE_NAME_PATTERN = r"([^/\\]+)$"
+
 
 def add_standard_bronze_metadata(
     df: DataFrame,
@@ -45,15 +58,14 @@ def add_standard_bronze_metadata(
     )
 
     return (
-        df
-        .withColumn("_source_file_path", source_file_path)
+        df.withColumn("_source_file_path", source_file_path)
         .withColumn(
             "_source_file_name",
             F.regexp_extract(F.col("_source_file_path"), FILE_NAME_PATTERN, 1),
         )
         .withColumn(
             "_source_load_date",
-            F.regexp_extract(F.col("_source_file_path"), LOAD_DATE_PATTERN, 1),
+            F.to_date(F.regexp_extract(F.col("_source_file_path"), LOAD_DATE_PATTERN, 1)),
         )
         .withColumn("_source_system", F.lit(source_system))
         .withColumn("_source_entity", F.lit(source_entity))
@@ -63,40 +75,54 @@ def add_standard_bronze_metadata(
     )
 
 
+def select_bronze_contract_columns(
+    df: DataFrame,
+    *,
+    raw_columns: list[str],
+) -> DataFrame:
+    """Return Bronze columns in the order declared by the DBML/DDL contract."""
+    return df.select(*raw_columns, *BRONZE_LINEAGE_COLUMNS)
+
+
 def validate_bronze_dataframe(df: DataFrame, *, source_entity: str) -> None:
     if df.limit(1).count() == 0:
         raise ValueError(f"Bronze batch for '{source_entity}' is empty.")
-    
-    missing_load_date_count = (
-        df
-        .filter(
-            F.col("_source_load_date").isNull()
-            | (F.col("_source_load_date") == "")
+
+    missing_lineage_count = (
+        df.filter(
+            F.col("_source_system").isNull()
+            | (F.trim(F.col("_source_system")) == "")
+            | F.col("_source_entity").isNull()
+            | (F.trim(F.col("_source_entity")) == "")
+            | F.col("_source_file_name").isNull()
+            | (F.trim(F.col("_source_file_name")) == "")
+            | F.col("_source_load_date").isNull()
+            | F.col("_source_file_path").isNull()
+            | (F.trim(F.col("_source_file_path")) == "")
+            | F.col("_ingestion_run_id").isNull()
+            | (F.trim(F.col("_ingestion_run_id")) == "")
+            | F.col("_ingested_at").isNull()
+            | F.col("_raw_record_hash").isNull()
+            | (F.trim(F.col("_raw_record_hash")) == "")
         )
         .limit(1)
         .count()
     )
 
-    if missing_load_date_count > 0:
+    if missing_lineage_count > 0:
         raise ValueError(
-            f"Bronze batch for '{source_entity}' contains rows without "
-            "_source_load_date. Expected folder pattern: load_date=YYYY-MM-DD."
+            f"Bronze batch for '{source_entity}' contains rows with null "
+            "contract lineage. Expected folder pattern: load_date=YYYY-MM-DD."
         )
 
 
-def get_source_load_dates(df: DataFrame) -> list[str]:
-    rows = (
-        df
-        .select("_source_load_date")
-        .distinct()
-        .orderBy("_source_load_date")
-        .collect()
-    )
+def get_source_load_dates(df: DataFrame) -> list[date]:
+    rows = df.select("_source_load_date").distinct().orderBy("_source_load_date").collect()
 
     return [row["_source_load_date"] for row in rows]
 
 
-def build_replace_where(load_dates: Iterable[str]) -> str:
+def build_replace_where(load_dates: Iterable[date]) -> str:
     """
     When rewriting Bronze table, only replace the days that are currently getting loaded.
     """
@@ -104,18 +130,18 @@ def build_replace_where(load_dates: Iterable[str]) -> str:
 
     if not load_dates:
         raise ValueError("Cannot build replaceWhere predicate for empty load date list.")
-    
+
     quoted_dates = ", ".join(f"'{load_date}'" for load_date in load_dates)
 
     return f"_source_load_date IN ({quoted_dates})"
 
 
 def write_delta_idempotent_by_load_date(
-        spark: SparkSession,
-        df: DataFrame,
-        *,
-        output_path: str | Path,
-        source_entity: str,
+    spark: SparkSession,
+    df: DataFrame,
+    *,
+    output_path: str | Path,
+    source_entity: str,
 ) -> None:
     """
     Writes Bronze Delta data idempotently.
@@ -135,8 +161,7 @@ def write_delta_idempotent_by_load_date(
 
     if not DeltaTable.isDeltaTable(spark, output_path):
         (
-            df.write
-            .format("delta")
+            df.write.format("delta")
             .mode("overwrite")
             .option("overwriteSchema", "true")
             .partitionBy("_source_load_date")
@@ -148,8 +173,7 @@ def write_delta_idempotent_by_load_date(
     replace_where = build_replace_where(source_load_dates)
 
     (
-        df.write
-        .format("delta")
+        df.write.format("delta")
         .mode("overwrite")
         .option("replaceWhere", replace_where)
         .save(output_path)

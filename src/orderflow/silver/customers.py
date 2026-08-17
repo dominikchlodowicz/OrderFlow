@@ -4,7 +4,7 @@ from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from orderflow.common.validation import validate_required_columns
-from orderflow.silver.common import run_silver_pipeline
+from orderflow.silver.common import run_silver_pipeline, run_silver_table_pipeline
 
 CUSTOMERS_REQUIRED_COLUMNS = [
     "customer_id",
@@ -20,6 +20,11 @@ CUSTOMERS_REQUIRED_COLUMNS = [
     "load_date",
     "loaded_at",
     "source_event_at",
+    "_source_file_name",
+    "_source_file_path",
+    "_ingestion_run_id",
+    "_ingested_at",
+    "_raw_record_hash",
 ]
 
 
@@ -55,7 +60,7 @@ def transform_customers_silver(
         F.lower(normalize_blank_to_null("email")).alias("email"),
         normalize_blank_to_null("first_name").alias("first_name"),
         normalize_blank_to_null("last_name").alias("last_name"),
-        normalize_blank_to_null("country_code").alias("country_code"),
+        F.upper(normalize_blank_to_null("country_code")).alias("country_code"),
         normalize_blank_to_null("city").alias("city"),
         try_cast_column(
             "created_at",
@@ -82,6 +87,11 @@ def transform_customers_silver(
             "source_event_at",
             "timestamp",
         ).alias("source_event_at"),
+        F.col("_source_file_name"),
+        F.col("_source_file_path"),
+        F.col("_ingestion_run_id"),
+        F.col("_ingested_at").alias("_bronze_ingested_at"),
+        F.col("_raw_record_hash"),
     ).withColumn(
         "_silver_processed_at",
         F.current_timestamp(),
@@ -116,6 +126,15 @@ def validate_customers_silver(
         | F.col("email").isNull()
         | F.col("first_name").isNull()
         | F.col("last_name").isNull()
+        | F.col("country_code").isNull()
+        | F.col("customer_status").isNull()
+        | F.col("marketing_consent").isNull()
+        | F.col("_source_file_name").isNull()
+        | F.col("_source_file_path").isNull()
+        | F.col("_ingestion_run_id").isNull()
+        | F.col("_bronze_ingested_at").isNull()
+        | F.col("_raw_record_hash").isNull()
+        | F.col("_silver_processed_at").isNull()
     ).count()
 
     if invalid_required_rows > 0:
@@ -149,5 +168,18 @@ def run_customers_silver(
         spark=spark,
         input_path=input_path,
         output_path=output_path,
+        transform=transform_customers_silver,
+    )
+
+
+def run_customers_silver_tables(
+    spark: SparkSession,
+    input_table: str,
+    output_table: str,
+) -> None:
+    run_silver_table_pipeline(
+        spark=spark,
+        input_table=input_table,
+        output_table=output_table,
         transform=transform_customers_silver,
     )

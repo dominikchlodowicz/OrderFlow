@@ -20,10 +20,10 @@ bootstrap_databricks_notebook(
 
 # COMMAND ----------
 
-path = build_adls2_path("/silver/delta/calendar")
+from orderflow.config.constants import CALENDAR_SILVER_TABLE
 
-verify_delta_table(
+verify_catalog_table(
     spark=spark,
-    path=path,
+    table_name=CALENDAR_SILVER_TABLE,
     order_by="date_day",
 )

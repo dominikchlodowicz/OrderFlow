@@ -7,20 +7,35 @@ from pyspark.sql import types as T
 
 from orderflow.silver.calendar import run_calendar_silver
 
+EXPECTED_SILVER_COLUMNS = [
+    "date_day",
+    "year",
+    "quarter",
+    "month",
+    "day_of_month",
+    "day_of_week",
+    "day_name",
+    "week_of_year",
+    "is_weekend",
+    "is_polish_public_holiday",
+    "holiday_name",
+    "_source_file_name",
+    "_source_file_path",
+    "_ingestion_run_id",
+    "_bronze_ingested_at",
+    "_raw_record_hash",
+    "_silver_processed_at",
+]
+
 
 def write_bronze_calendar_delta(
     spark: SparkSession,
     path: Path,
-    rows: list[dict[str, str]],
+    rows: list[dict[str, object]],
 ) -> None:
     bronze_df = spark.createDataFrame(rows)
 
-    (
-        bronze_df.write
-        .format("delta")
-        .mode("overwrite")
-        .save(str(path))
-    )
+    (bronze_df.write.format("delta").mode("overwrite").save(str(path)))
 
 
 def read_silver_calendar_delta(
@@ -45,7 +60,12 @@ def calendar_row(
     holiday_name: str = "",
     load_date: str = "2026-06-01",
     loaded_at: str = "2026-06-01 01:00:00",
-) -> dict[str, str]:
+    source_file_name: str = "calendar.csv",
+    source_file_path: str = "/Volumes/orderflow_dev/bronze/landing/calendar.csv",
+    ingestion_run_id: str = "run-001",
+    ingested_at: datetime = datetime(2026, 6, 1, 1, 5, 0),
+    raw_record_hash: str = "calendar-hash",
+) -> dict[str, object]:
     return {
         "date_day": date_day,
         "year": year,
@@ -60,6 +80,12 @@ def calendar_row(
         "holiday_name": holiday_name,
         "load_date": load_date,
         "loaded_at": loaded_at,
+        "_source_file_name": source_file_name,
+        "_source_file_path": source_file_path,
+        "_source_load_date": date.fromisoformat(load_date),
+        "_ingestion_run_id": ingestion_run_id,
+        "_ingested_at": ingested_at,
+        "_raw_record_hash": raw_record_hash,
     }
 
 
@@ -90,6 +116,7 @@ def test_run_calendar_silver_writes_typed_delta_table(
     )
 
     assert result_df.count() == 1
+    assert result_df.columns == EXPECTED_SILVER_COLUMNS
 
     schema = result_df.schema
 
@@ -104,8 +131,11 @@ def test_run_calendar_silver_writes_typed_delta_table(
     assert isinstance(schema["is_weekend"].dataType, T.BooleanType)
     assert isinstance(schema["is_polish_public_holiday"].dataType, T.BooleanType)
     assert isinstance(schema["holiday_name"].dataType, T.StringType)
-    assert isinstance(schema["source_load_date"].dataType, T.DateType)
-    assert isinstance(schema["source_loaded_at"].dataType, T.TimestampType)
+    assert isinstance(schema["_source_file_name"].dataType, T.StringType)
+    assert isinstance(schema["_source_file_path"].dataType, T.StringType)
+    assert isinstance(schema["_ingestion_run_id"].dataType, T.StringType)
+    assert isinstance(schema["_bronze_ingested_at"].dataType, T.TimestampType)
+    assert isinstance(schema["_raw_record_hash"].dataType, T.StringType)
     assert isinstance(schema["_silver_processed_at"].dataType, T.TimestampType)
 
     row = result_df.first()
@@ -121,8 +151,8 @@ def test_run_calendar_silver_writes_typed_delta_table(
     assert row["is_weekend"] is False
     assert row["is_polish_public_holiday"] is False
     assert row["holiday_name"] is None
-    assert row["source_load_date"] == date(2026, 6, 1)
-    assert row["source_loaded_at"] == datetime(2026, 6, 1, 1, 0, 0)
+    assert row["_source_file_name"] == "calendar.csv"
+    assert row["_bronze_ingested_at"] == datetime(2026, 6, 1, 1, 5, 0)
 
 
 def test_run_calendar_silver_preserves_weekend_and_holiday_values(
@@ -170,10 +200,7 @@ def test_run_calendar_silver_preserves_weekend_and_holiday_values(
         path=silver_path,
     )
 
-    rows = {
-        row["date_day"]: row
-        for row in result_df.collect()
-    }
+    rows = {row["date_day"]: row for row in result_df.collect()}
 
     assert rows[date(2026, 6, 6)]["is_weekend"] is True
     assert rows[date(2026, 6, 7)]["is_weekend"] is True
@@ -195,11 +222,15 @@ def test_run_calendar_silver_deduplicates_by_date_day_using_latest_loaded_at(
                 date_day="2026-06-01",
                 day_name="Old Monday",
                 loaded_at="2026-06-01 01:00:00",
+                source_file_name="calendar-old.csv",
+                raw_record_hash="old-hash",
             ),
             calendar_row(
                 date_day="2026-06-01",
                 day_name="Monday",
                 loaded_at="2026-06-01 02:00:00",
+                source_file_name="calendar-new.csv",
+                raw_record_hash="new-hash",
             ),
         ],
     )
@@ -221,7 +252,8 @@ def test_run_calendar_silver_deduplicates_by_date_day_using_latest_loaded_at(
 
     assert row["date_day"] == date(2026, 6, 1)
     assert row["day_name"] == "Monday"
-    assert row["source_loaded_at"] == datetime(2026, 6, 1, 2, 0, 0)
+    assert row["_source_file_name"] == "calendar-new.csv"
+    assert row["_raw_record_hash"] == "new-hash"
 
 
 def test_run_calendar_silver_rejects_invalid_calendar_values(
