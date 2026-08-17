@@ -10,7 +10,7 @@
 
 -- COMMAND ----------
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_calendar (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.calendar (
   date_day STRING,
   year STRING,
   quarter STRING,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_calendar (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_customers (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.customers (
   customer_id STRING,
   email STRING,
   first_name STRING,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_customers (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_exchange_rate (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.exchange_rate (
   rate_date STRING,
   currency STRING,
   rate_to_pln STRING,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_exchange_rate (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_marketing_campaigns (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.marketing_campaigns (
   campaign_id STRING,
   campaign_name STRING,
   source_channel STRING,
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_marketing_campaigns (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_order_items (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.order_items (
   order_item_id STRING,
   order_id STRING,
   product_id STRING,
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_order_items (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_orders (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.orders (
   order_id STRING,
   customer_id STRING,
   order_status STRING,
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_orders (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_payments (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.payments (
   payment_id STRING,
   order_id STRING,
   payment_attempt_number STRING,
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_payments (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_products (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.products (
   product_id STRING,
   sku STRING,
   product_name STRING,
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_products (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_refunds (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.refunds (
   refund_id STRING,
   order_id STRING,
   payment_id STRING,
@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_refunds (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_shipments (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.shipments (
   shipment_id STRING,
   order_id STRING,
   carrier STRING,
@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_shipments (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_web_events (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.web_events (
   event_id STRING,
   session_id STRING,
   customer_id STRING,
@@ -279,7 +279,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_web_events (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.bronze_exchange_rates (
+CREATE TABLE IF NOT EXISTS orderflow_dev.bronze.exchange_rates (
   rate_date STRING,
   currency STRING,
   rate_to_pln STRING,
@@ -301,7 +301,7 @@ USING DELTA;
 
 -- Silver contracts: conformed types and required fields from silver.dbml.
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_calendar (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.calendar (
   date_day DATE,
   year INT,
   quarter INT,
@@ -322,7 +322,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_calendar (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_customers (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.customers (
   customer_id STRING NOT NULL COMMENT 'Source customer identifier',
   email STRING NOT NULL,
   first_name STRING NOT NULL,
@@ -348,7 +348,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_customers (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_exchange_rate (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.exchange_rate (
   exchange_rate_key BIGINT NOT NULL,
   rate_date_key STRING,
   rate_date DATE,
@@ -366,7 +366,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_exchange_rate (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_order_items (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.order_items (
   order_item_id STRING NOT NULL,
   order_id STRING NOT NULL,
   product_id STRING NOT NULL,
@@ -388,7 +388,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_order_items (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_orders (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.orders (
   order_id STRING NOT NULL,
   customer_id STRING,
   order_status STRING NOT NULL COMMENT 'One of: created, paid, shipped, cancelled, returned',
@@ -413,7 +413,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_orders (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_payments (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.payments (
   payment_id STRING NOT NULL COMMENT 'Source payment identifier',
   order_id STRING NOT NULL COMMENT 'Source order identifier',
   payment_attempt_number INT NOT NULL,
@@ -437,7 +437,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_payments (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_web_events (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.web_events (
   event_id STRING NOT NULL COMMENT 'Source web event identifier',
   session_id STRING NOT NULL,
   customer_id STRING,
@@ -462,7 +462,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_web_events (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_shipments (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.shipments (
   shipment_id STRING NOT NULL COMMENT 'Source shipment identifier',
   order_id STRING NOT NULL,
   carrier STRING NOT NULL,
@@ -487,7 +487,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_shipments (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_refunds (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.refunds (
   refund_id STRING NOT NULL COMMENT 'Source refund identifier',
   order_id STRING NOT NULL,
   payment_id STRING NOT NULL,
@@ -511,7 +511,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_refunds (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_marketing_campaigns (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.marketing_campaigns (
   campaign_id STRING NOT NULL COMMENT 'Source campaign identifier',
   campaign_name STRING NOT NULL,
   source_channel STRING,
@@ -536,7 +536,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_marketing_campaigns (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_products (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.products (
   product_id STRING NOT NULL COMMENT 'Source product identifier',
   sku STRING NOT NULL,
   product_name STRING NOT NULL,
@@ -561,7 +561,7 @@ CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_products (
 )
 USING DELTA;
 
-CREATE TABLE IF NOT EXISTS orderflow_dev.silver.silver_exchange_rates (
+CREATE TABLE IF NOT EXISTS orderflow_dev.silver.exchange_rates (
   rate_date DATE,
   currency STRING NOT NULL COMMENT 'Uppercase ISO 4217 currency code',
   rate_to_pln DECIMAL(18, 2) NOT NULL COMMENT 'Must be >= 0.0',

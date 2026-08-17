@@ -439,10 +439,10 @@ def test_align_dataframe_to_table_contract_rejects_type_drift() -> None:
 @pytest.mark.parametrize(
     ("actual_table", "contract_table"),
     [
-        (CALENDAR_BRONZE_TABLE, "orderflow_dev.bronze.bronze_calendar"),
-        (CUSTOMERS_BRONZE_TABLE, "orderflow_dev.bronze.bronze_customers"),
-        (CALENDAR_SILVER_TABLE, "orderflow_dev.silver.silver_calendar"),
-        (CUSTOMERS_SILVER_TABLE, "orderflow_dev.silver.silver_customers"),
+        (CALENDAR_BRONZE_TABLE, "orderflow_dev.bronze.calendar"),
+        (CUSTOMERS_BRONZE_TABLE, "orderflow_dev.bronze.customers"),
+        (CALENDAR_SILVER_TABLE, "orderflow_dev.silver.calendar"),
+        (CUSTOMERS_SILVER_TABLE, "orderflow_dev.silver.customers"),
         (CALENDAR_GOLD_TABLE, "orderflow_dev.gold.dim_calendar"),
         (CUSTOMERS_GOLD_TABLE, "orderflow_dev.gold.dim_customers"),
     ],
