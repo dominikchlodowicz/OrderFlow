@@ -1,11 +1,12 @@
 import csv
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 import pytest
+from delta.tables import DeltaTable
 from helpers.constants import STANDARD_BRONZE_METADATA_COLUMNS
 from pyspark.sql import types as T
 
@@ -347,16 +348,34 @@ BRONZE_DATASET_CASES = [
 ]
 
 
-def _write_csv(csv_path: Path, case: BronzeDatasetCase) -> None:
+def _write_csv_rows(
+    csv_path: Path,
+    case: BronzeDatasetCase,
+    rows: Iterable[dict[str, str | None]],
+) -> None:
     with csv_path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=case.columns)
         writer.writeheader()
-        writer.writerow(case.raw_row)
+        writer.writerows(rows)
 
 
-def _expected_raw_record_hash(case: BronzeDatasetCase) -> str:
-    payload = "||".join(case.raw_row[column] for column in case.columns)
+def _write_csv(csv_path: Path, case: BronzeDatasetCase) -> None:
+    _write_csv_rows(csv_path, case, [case.raw_row])
+
+
+def _expected_raw_record_hash(
+    case: BronzeDatasetCase,
+    raw_row: dict[str, str | None] | None = None,
+) -> str:
+    raw_row = raw_row or case.raw_row
+    payload = "||".join(
+        "<NULL>" if raw_row[column] is None else raw_row[column] for column in case.columns
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _case_for(source_entity: str) -> BronzeDatasetCase:
+    return next(case for case in BRONZE_DATASET_CASES if case.source_entity == source_entity)
 
 
 @pytest.mark.parametrize(
@@ -414,9 +433,137 @@ def test_run_bronze_dataset_writes_contract_row(
     assert row["_source_entity"] == case.source_entity
     assert row["_source_file_name"] == f"{case.source_entity}.csv"
     assert row["_source_load_date"] == date.fromisoformat(LOAD_DATE)
-    assert row["_source_file_path"].endswith(
-        f"load_date={LOAD_DATE}/{case.source_entity}.csv"
-    )
+    assert row["_source_file_path"].endswith(f"load_date={LOAD_DATE}/{case.source_entity}.csv")
     assert row["_ingestion_run_id"]
     assert row["_ingested_at"] is not None
     assert row["_raw_record_hash"] == _expected_raw_record_hash(case)
+
+
+def test_bronze_dataset_replay_replaces_only_target_load_date(spark, tmp_path: Path) -> None:
+    case = _case_for("orders")
+    first_load_date = "2026-06-15"
+    second_load_date = "2026-06-16"
+    base_input_path = tmp_path / "landing" / case.source_entity
+    first_day = base_input_path / f"load_date={first_load_date}"
+    second_day = base_input_path / f"load_date={second_load_date}"
+    output_path = tmp_path / "bronze" / case.source_entity
+
+    first_day.mkdir(parents=True)
+    second_day.mkdir(parents=True)
+
+    first_row = {
+        **case.raw_row,
+        "order_id": "ord_first",
+        "order_status": "paid",
+        "load_date": first_load_date,
+    }
+    second_row = {
+        **case.raw_row,
+        "order_id": "ord_second",
+        "order_status": "pending",
+        "load_date": second_load_date,
+    }
+
+    _write_csv_rows(first_day / "orders.csv", case, [first_row])
+    _write_csv_rows(second_day / "orders.csv", case, [second_row])
+
+    case.run_bronze(spark=spark, input_path=base_input_path, output_path=output_path)
+
+    replayed_second_row = {**second_row, "order_status": "cancelled"}
+    _write_csv_rows(second_day / "orders.csv", case, [replayed_second_row])
+
+    case.run_bronze(spark=spark, input_path=second_day, output_path=output_path)
+
+    result = [
+        row.asDict()
+        for row in spark.read.format("delta")
+        .load(str(output_path))
+        .select("order_id", "order_status", "_source_load_date")
+        .orderBy("_source_load_date")
+        .collect()
+    ]
+
+    assert result == [
+        {
+            "order_id": "ord_first",
+            "order_status": "paid",
+            "_source_load_date": date.fromisoformat(first_load_date),
+        },
+        {
+            "order_id": "ord_second",
+            "order_status": "cancelled",
+            "_source_load_date": date.fromisoformat(second_load_date),
+        },
+    ]
+    assert DeltaTable.forPath(spark, str(output_path)).detail().first()["partitionColumns"] == [
+        "_source_load_date"
+    ]
+
+
+def test_bronze_dataset_rejects_empty_batch(spark, tmp_path: Path) -> None:
+    case = _case_for("orders")
+    input_path = tmp_path / "landing" / case.source_entity / f"load_date={LOAD_DATE}"
+    input_path.mkdir(parents=True)
+    _write_csv_rows(input_path / "orders.csv", case, [])
+
+    with pytest.raises(ValueError, match="Bronze batch for 'orders' is empty"):
+        case.dataset.build_bronze(spark=spark, input_path=input_path)
+
+
+def test_bronze_dataset_rejects_path_without_load_date(spark, tmp_path: Path) -> None:
+    case = _case_for("orders")
+    input_path = tmp_path / "landing" / case.source_entity / "incoming"
+    input_path.mkdir(parents=True)
+    _write_csv(input_path / "orders.csv", case)
+
+    with pytest.raises(ValueError, match="Expected folder pattern: load_date=YYYY-MM-DD"):
+        case.dataset.build_bronze(spark=spark, input_path=input_path)
+
+
+def test_bronze_dataset_preserves_nullable_raw_values_and_batch_metadata(
+    spark,
+    tmp_path: Path,
+) -> None:
+    case = _case_for("payments")
+    input_path = tmp_path / "landing" / case.source_entity / f"load_date={LOAD_DATE}"
+    input_path.mkdir(parents=True)
+
+    null_failure_row = {
+        **case.raw_row,
+        "payment_id": "pay_null",
+        "failure_reason": None,
+    }
+    special_failure_row = {
+        **case.raw_row,
+        "payment_id": "pay_special",
+        "failure_reason": "bank, timeout – Żółć",
+    }
+    _write_csv_rows(
+        input_path / "payments.csv",
+        case,
+        [null_failure_row, special_failure_row],
+    )
+
+    result = {
+        row["payment_id"]: row.asDict()
+        for row in case.dataset.build_bronze(
+            spark=spark,
+            input_path=input_path,
+            source_system="test_source",
+            ingestion_run_id="test_batch",
+        ).collect()
+    }
+
+    assert result["pay_null"]["failure_reason"] is None
+    assert result["pay_special"]["failure_reason"] == "bank, timeout – Żółć"
+    assert {row["_source_system"] for row in result.values()} == {"test_source"}
+    assert {row["_ingestion_run_id"] for row in result.values()} == {"test_batch"}
+    assert len({row["_ingested_at"] for row in result.values()}) == 1
+    assert result["pay_null"]["_raw_record_hash"] == _expected_raw_record_hash(
+        case,
+        null_failure_row,
+    )
+    assert result["pay_special"]["_raw_record_hash"] == _expected_raw_record_hash(
+        case,
+        special_failure_row,
+    )

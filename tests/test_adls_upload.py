@@ -112,7 +112,7 @@ def test_config_from_env_builds_config_from_environment(tmp_path, monkeypatch) -
         local_path=tmp_path,
         container_name="lakehouse",
         connection_string="connection-string",
-        target_prefix="bronze/landing",
+        target_prefix="landing",
     )
 
 
@@ -132,7 +132,7 @@ def test_config_from_env_uses_optional_defaults(tmp_path, monkeypatch) -> None:
         local_path=Path("data/raw"),
         container_name="lakehouse",
         connection_string="connection-string",
-        target_prefix="bronze/landing",
+        target_prefix="landing",
     )
 
 

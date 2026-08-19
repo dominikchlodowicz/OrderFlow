@@ -160,18 +160,22 @@ def test_run_customers_bronze_extracts_multiple_load_dates(
     assert result_df.count() == 2
 
 
-def test_run_customers_bronze_rerun_does_not_duplicate_rows(
+def test_run_customers_bronze_replay_replaces_only_target_load_date(
     spark,
     tmp_path: Path,
 ) -> None:
-    load_date = "2026-06-01"
-    input_path = tmp_path / "landing" / "customers" / f"load_date={load_date}"
+    first_load_date = "2026-06-01"
+    second_load_date = "2026-06-02"
+    base_input_path = tmp_path / "landing" / "customers"
+    first_day = base_input_path / f"load_date={first_load_date}"
+    second_day = base_input_path / f"load_date={second_load_date}"
     output_path = tmp_path / "bronze" / "customers"
 
-    input_path.mkdir(parents=True)
+    first_day.mkdir(parents=True)
+    second_day.mkdir(parents=True)
 
     _write_customers_csv(
-        input_path / "customers.csv",
+        first_day / "customers.csv",
         _customers_row(
             customer_id="cust_001",
             email="anna.kowalska@example.com",
@@ -179,21 +183,53 @@ def test_run_customers_bronze_rerun_does_not_duplicate_rows(
             last_name="Kowalska",
             country_code="PL",
             city="Warszawa",
-            load_date=load_date,
+            load_date=first_load_date,
+        ),
+    )
+    _write_customers_csv(
+        second_day / "customers.csv",
+        _customers_row(
+            customer_id="cust_002",
+            email="max.mustermann@example.com",
+            first_name="Max",
+            last_name="Mustermann",
+            country_code="DE",
+            city="Berlin",
+            load_date=second_load_date,
         ),
     )
 
     run_customers_bronze(
         spark=spark,
-        input_path=input_path.parent,
+        input_path=base_input_path,
         output_path=output_path,
     )
+
+    _write_customers_csv(
+        second_day / "customers.csv",
+        _customers_row(
+            customer_id="cust_002",
+            email="max.mustermann@example.com",
+            first_name="Max",
+            last_name="Mustermann",
+            country_code="DE",
+            city="Hamburg",
+            load_date=second_load_date,
+        ),
+    )
+
     run_customers_bronze(
         spark=spark,
-        input_path=input_path.parent,
+        input_path=second_day,
         output_path=output_path,
     )
 
     result_df = spark.read.format("delta").load(str(output_path))
 
-    assert result_df.count() == 1
+    assert {
+        row["_source_load_date"]: (row["customer_id"], row["city"])
+        for row in result_df.select("_source_load_date", "customer_id", "city").collect()
+    } == {
+        date.fromisoformat(first_load_date): ("cust_001", "Warszawa"),
+        date.fromisoformat(second_load_date): ("cust_002", "Hamburg"),
+    }
