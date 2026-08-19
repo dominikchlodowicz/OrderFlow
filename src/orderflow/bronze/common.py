@@ -45,6 +45,7 @@ def add_standard_bronze_metadata(
     FILE_NAME_PATTERN = r"([^/\\]+)$"
 
     source_file_path = F.col("_metadata.file_path")
+    source_load_date = F.regexp_extract(source_file_path, LOAD_DATE_PATTERN, 1)
 
     raw_record_hash = F.sha2(
         F.concat_ws(
@@ -65,7 +66,7 @@ def add_standard_bronze_metadata(
         )
         .withColumn(
             "_source_load_date",
-            F.to_date(F.regexp_extract(F.col("_source_file_path"), LOAD_DATE_PATTERN, 1)),
+            F.try_to_timestamp(source_load_date, F.lit("yyyy-MM-dd")).cast("date"),
         )
         .withColumn("_source_system", F.lit(source_system))
         .withColumn("_source_entity", F.lit(source_entity))

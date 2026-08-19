@@ -8,8 +8,9 @@ from orderflow.bronze.common import (
     add_standard_bronze_metadata,
     select_bronze_contract_columns,
     validate_bronze_dataframe,
+    write_delta_idempotent_by_load_date,
 )
-from orderflow.common.delta import write_delta, write_delta_table
+from orderflow.common.delta import write_delta_table
 from orderflow.common.validation import validate_required_columns
 from orderflow.config.constants import ADLS_SOURCE_SYSTEM
 
@@ -102,12 +103,11 @@ def run_calendar_bronze(
         input_path=input_path,
     )
 
-    write_delta(
+    write_delta_idempotent_by_load_date(
+        spark=spark,
         df=bronze_df,
-        path=output_path,
-        mode="overwrite",
-        overwrite_schema=True,
-        partition_by=["_source_load_date"],
+        output_path=output_path,
+        source_entity="calendar",
     )
 
 
