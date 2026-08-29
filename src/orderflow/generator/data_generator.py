@@ -387,10 +387,20 @@ class OrderFlowGenerator:
                 order_items.append(self._with_load_metadata(item, load_date, order_created_at))
 
             currency = self.CURRENCIES_BY_COUNTRY[customer["country_code"]]
-            net_amount_pln = round(gross_amount - discount_amount, 2)
-            net_amount = self._convert_from_pln(net_amount_pln, currency)
-            gross_amount_converted = self._convert_from_pln(round(gross_amount, 2), currency)
-            discount_amount_converted = self._convert_from_pln(round(discount_amount, 2), currency)
+            gross_amount_converted = self._convert_from_pln(
+                round(gross_amount, 2),
+                currency,
+            )
+            discount_amount_converted = self._convert_from_pln(
+                round(discount_amount, 2),
+                currency,
+            )
+            # Derive net from the final transaction-currency values so the
+            # DECIMAL(18, 2) contract remains exact after currency rounding.
+            net_amount = round(
+                gross_amount_converted - discount_amount_converted,
+                2,
+            )
 
             order = {
                 "order_id": order_id,
