@@ -21,7 +21,15 @@ from orderflow.silver.common import (
 )
 
 DECIMAL_TYPE = "decimal(18,2)"
-ORDER_STATUSES = ["created", "paid", "shipped", "cancelled", "returned"]
+ORDER_STATUSES = [
+    "created",
+    "paid",
+    "shipped",
+    "delivered",
+    "cancelled",
+    "partially_refunded",
+    "refunded"
+]
 
 ORDERS_REQUIRED_COLUMNS = [
     "order_id",

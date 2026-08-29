@@ -28,7 +28,7 @@ PAYMENT_METHODS = [
     "on delivery",
     "online installments",
 ]
-PAYMENT_STATUSES = ["captured", "authorized", "failed"]
+PAYMENT_STATUSES = ["captured", "authorized", "failed", "refunded"]
 FAILURE_REASONS = ["timeout", "insufficient_funds", "card_declined"]
 
 PAYMENTS_REQUIRED_COLUMNS = [

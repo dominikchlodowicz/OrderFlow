@@ -36,7 +36,9 @@ class GeneratorConfig:
     customer_update_rate: float = 0.03
     product_update_rate: float = 0.025
     late_arrival_rate: float = 0.07
-    invalid_record_rate: float = 0.012
+    # Keep normal generated datasets contract-valid. Enable this explicitly
+    # when producing fixtures for rejection/quarantine tests.
+    invalid_record_rate: float = 0.0
     duplicate_rate: float = 0.008
 
     include_empty_files: bool = True
@@ -66,7 +68,7 @@ class OrderFlowGenerator:
     - late-arriving records using event timestamps vs loaded_at
     - customer/product changes for dbt snapshots
     - realistic relationships between orders, items, payments, shipments, refunds
-    - controlled bad records for dbt/data-quality tests
+    - optional controlled bad records for data-quality tests
     - partitioned files for ingestion by load_date
     """
 
@@ -971,9 +973,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--avg-orders-per-day", type=int, default=80)
     parser.add_argument("--avg-web-sessions-per-day", type=int, default=350)
     parser.add_argument(
+        "--invalid-record-rate",
+        type=float,
+        default=0.0,
+        help=(
+            "Probability of injecting each supported invalid-record scenario per day. "
+            "Use 0 for contract-valid data; for example, use 0.012 for DQ test data."
+        ),
+    )
+    parser.add_argument(
         "--no-clean", action="store_true", help="Do not delete existing output before generation."
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not 0.0 <= args.invalid_record_rate <= 1.0:
+        parser.error("--invalid-record-rate must be between 0 and 1")
+    return args
 
 
 def main() -> None:
@@ -985,6 +999,7 @@ def main() -> None:
         seed=args.seed,
         avg_orders_per_day=args.avg_orders_per_day,
         avg_web_sessions_per_day=args.avg_web_sessions_per_day,
+        invalid_record_rate=args.invalid_record_rate,
         clean_output=not args.no_clean,
     )
     generator = OrderFlowGenerator(config)

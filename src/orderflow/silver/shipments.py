@@ -21,7 +21,7 @@ from orderflow.silver.common import (
 )
 
 DECIMAL_TYPE = "decimal(18,2)"
-SHIPMENT_STATUSES = ["lost", "shipped", "delivered"]
+SHIPMENT_STATUSES = ["lost", "shipped", "delivered", "returned"]
 
 SHIPMENTS_REQUIRED_COLUMNS = [
     "shipment_id",
