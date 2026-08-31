@@ -80,7 +80,7 @@ def test_orders_keeps_latest_business_update(spark: SparkSession) -> None:
 @pytest.mark.parametrize(
     ("overrides", "expected_message"),
     [
-        ({"order_status": "delivered"}, "invalid order status"),
+        ({"order_status": "invalid_order_status"}, "invalid order status"),
         ({"net_amount": "99.99"}, "inconsistent order amounts"),
         (
             {"order_updated_at": "2026-06-15 08:59:59"},

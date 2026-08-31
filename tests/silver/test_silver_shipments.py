@@ -83,7 +83,7 @@ def test_shipments_keeps_latest_lifecycle_version(spark: SparkSession) -> None:
 @pytest.mark.parametrize(
     ("overrides", "expected_message"),
     [
-        ({"shipment_status": "returned"}, "invalid shipment status or cost"),
+        ({"shipment_status": "invalid_shipment_status"}, "invalid shipment status or cost"),
         ({"shipping_cost": "-0.01"}, "invalid shipment status or cost"),
         ({"estimated_delivery_at": "2026-06-14"}, "estimated delivery before shipment"),
         ({"delivered_at": ""}, "invalid delivered_at"),

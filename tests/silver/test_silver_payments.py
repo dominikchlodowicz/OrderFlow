@@ -98,7 +98,7 @@ def test_payments_preserves_valid_failed_reason(spark: SparkSession) -> None:
             {"payment_status": "failed", "failure_reason": ""},
             "invalid failure reason",
         ),
-        ({"payment_status": "refunded"}, "invalid payment method or status"),
+        ({"payment_status": "invalid_payment_status"}, "invalid payment method or status"),
         ({"payment_attempt_number": "0"}, "invalid payment values"),
         ({"processed_at": "2026-06-15 09:04:00"}, "invalid payment values"),
     ],
