@@ -160,7 +160,7 @@ Table fct_payments {
 
   payment_attempt_number int [not null, note: 'Must be > 0 within an order']
   payment_method varchar [not null, note: 'One of: card, paypal, blik, bank_transfer, cash_on_delivery, online_installments']
-  payment_status varchar [not null, note: 'One of: authorized, captured, failed']
+  payment_status varchar [not null, note: 'One of: authorized, captured, failed, refunded']
   failure_reason varchar [note: 'Required when payment_status = failed; otherwise null. One of: timeout, insufficient_funds, card_declined']
   amount decimal(18, 2) [not null, note: 'Must be >= 0']
   created_at timestamp [not null]
@@ -208,7 +208,7 @@ Table fct_shipments {
   delivered_date_key int [ref: > dim_calendar.date_key]
 
   carrier varchar [not null]
-  shipment_status varchar [not null, note: 'One of: lost, shipped, delivered']
+  shipment_status varchar [not null, note: 'One of: lost, shipped, delivered, returned']
   shipped_at timestamp [not null]
   delivered_at timestamp [note: 'Required when shipment_status = delivered; must be >= shipped_at']
   delivery_country_code varchar [not null, note: 'Uppercase ISO 3166-1 alpha-2 country code']

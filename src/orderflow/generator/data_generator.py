@@ -1,9 +1,10 @@
-from dataclasses import dataclass
-from pathlib import Path
-from uuid import uuid4
 import argparse
 import random
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pandas as pd
 from faker import Faker
@@ -100,6 +101,15 @@ class OrderFlowGenerator:
         "purchase_completed",
     ]
     SOURCE_CHANNELS = ["organic", "paid_search", "email", "social", "direct"]
+    CALENDAR_REFERENCE_COLUMNS_BY_TABLE = {
+        "orders": ["order_created_at"],
+        "order_items": ["created_at"],
+        "payments": ["created_at", "processed_at"],
+        "refunds": ["created_at", "processed_at"],
+        "shipments": ["shipped_at", "estimated_delivery_at", "delivered_at"],
+        "web_events": ["event_timestamp"],
+        "exchange_rates": ["rate_date"],
+    }
 
     def __init__(self, config: GeneratorConfig) -> None:
         self.config = config
@@ -121,6 +131,7 @@ class OrderFlowGenerator:
         self.refunds_by_order_id: dict[str, list[dict[str, Any]]] = {}
 
         self.scheduled_events: list[dict[str, Any]] = []
+        self.calendar_reference_dates: set[date] = set()
         self.base_exchange_rates_to_pln = {
             "PLN": 1.0,
             "EUR": 4.32,
@@ -131,6 +142,7 @@ class OrderFlowGenerator:
         if self.config.clean_output and self.output_root.exists():
             self._remove_output_tree(self.output_root)
 
+        self.calendar_reference_dates.clear()
         self._generate_initial_customers()
         self._generate_initial_products()
         self._generate_marketing_campaigns()
@@ -179,9 +191,48 @@ class OrderFlowGenerator:
             rows["web_events"].extend(self._generate_web_events(load_date, daily_orders))
 
             self._inject_quality_issues(rows)
+            self._capture_calendar_reference_dates(rows)
 
             for table_name, table_rows in rows.items():
                 self._write_partition(table_name, load_date, table_rows)
+
+        self._write_calendar_coverage(all_dates)
+
+    def _capture_calendar_reference_dates(
+        self,
+        rows_by_table: dict[str, list[dict[str, Any]]],
+    ) -> None:
+        for table_name, date_columns in self.CALENDAR_REFERENCE_COLUMNS_BY_TABLE.items():
+            for row in rows_by_table[table_name]:
+                for date_column in date_columns:
+                    value = row.get(date_column)
+                    if value in (None, ""):
+                        continue
+
+                    timestamp = pd.Timestamp(value)
+                    if not pd.isna(timestamp):
+                        self.calendar_reference_dates.add(timestamp.date())
+
+    def _write_calendar_coverage(self, generated_dates: list[date]) -> None:
+        generated_date_set = set(generated_dates)
+        required_dates = generated_date_set | self.calendar_reference_dates
+        coverage_dates = [
+            timestamp.date()
+            for timestamp in pd.date_range(
+                min(required_dates),
+                max(required_dates),
+            )
+        ]
+
+        for calendar_date in coverage_dates:
+            if calendar_date in generated_date_set:
+                continue
+
+            self._write_partition(
+                "calendar",
+                calendar_date,
+                [self._calendar_row(calendar_date)],
+            )
 
     def _remove_output_tree(self, path: Path) -> None:
         for child in path.glob("**/*"):

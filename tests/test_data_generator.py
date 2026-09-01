@@ -72,6 +72,16 @@ REQUIRED_COLUMNS_BY_TABLE = {
     },
 }
 
+CALENDAR_REFERENCE_COLUMNS_BY_TABLE = {
+    "orders": ["order_created_at"],
+    "order_items": ["created_at"],
+    "payments": ["created_at", "processed_at"],
+    "refunds": ["created_at", "processed_at"],
+    "shipments": ["shipped_at", "estimated_delivery_at", "delivered_at"],
+    "web_events": ["event_timestamp"],
+    "exchange_rates": ["rate_date"],
+}
+
 
 def small_config(output_dir: Path, seed: int = 123) -> GeneratorConfig:
     return GeneratorConfig(
@@ -161,6 +171,51 @@ def test_order_items_reference_existing_orders(generated_output) -> None:
     assert not orders.empty
     assert not order_items.empty
     assert set(order_items["order_id"]) <= set(orders["order_id"])
+
+
+def test_calendar_covers_every_date_referenced_by_generated_facts(generated_output) -> None:
+    calendar = read_table(generated_output, "calendar")
+    calendar_dates = set(pd.to_datetime(calendar["date_day"]).dt.date)
+    referenced_dates = set()
+
+    for table_name, date_columns in CALENDAR_REFERENCE_COLUMNS_BY_TABLE.items():
+        table = read_table(generated_output, table_name)
+        for date_column in date_columns:
+            if date_column not in table.columns:
+                continue
+            referenced_dates.update(
+                pd.to_datetime(table[date_column], errors="coerce").dropna().dt.date
+            )
+
+    assert referenced_dates <= calendar_dates
+
+
+def test_generated_calendar_is_a_contiguous_date_spine(generated_output) -> None:
+    calendar = read_table(generated_output, "calendar")
+    calendar_dates = sorted(set(pd.to_datetime(calendar["date_day"]).dt.date))
+    expected_dates = [
+        timestamp.date()
+        for timestamp in pd.date_range(
+            calendar_dates[0],
+            calendar_dates[-1],
+        )
+    ]
+
+    assert calendar_dates == expected_dates
+
+
+def test_calendar_extension_does_not_create_future_business_partitions(
+    generated_output,
+) -> None:
+    configured_end_date = pd.Timestamp(LOAD_DATES[-1]).date()
+
+    for table_name in set(ENTITY_TABLES) - {"calendar"}:
+        partition_dates = {
+            pd.Timestamp(partition.name.removeprefix("load_date=")).date()
+            for partition in (generated_output / table_name).glob("load_date=*")
+        }
+
+        assert all(date_value <= configured_end_date for date_value in partition_dates)
 
 
 @pytest.mark.xfail(
