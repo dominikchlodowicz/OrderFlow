@@ -2,14 +2,28 @@ from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
 from orderflow.common.delta import (
     read_delta,
     read_delta_table,
-    write_delta,
-    write_delta_table,
 )
 from orderflow.common.validation import validate_required_columns
+from orderflow.gold.common import (
+    ANONYMOUS_CUSTOMER_ID,
+    ANONYMOUS_CUSTOMER_KEY,
+    GUEST_CUSTOMER_ID,
+    GUEST_CUSTOMER_KEY,
+    UNKNOWN_KEY,
+    UNKNOWN_MEMBER_ID,
+    surrogate_key,
+    validate_required_values,
+    validate_rule,
+    validate_unique_key,
+    with_gold_processed_at,
+    write_gold,
+    write_gold_table,
+)
 
 DIM_CUSTOMERS_REQUIRED_COLUMNS = [
     "customer_id",
@@ -23,7 +37,75 @@ DIM_CUSTOMERS_REQUIRED_COLUMNS = [
     "created_at",
 ]
 
-NON_NEGATIVE_BIGINT_MASK = (1 << 63) - 1
+SPECIAL_CUSTOMER_SCHEMA = T.StructType(
+    [
+        T.StructField("customer_key", T.LongType(), nullable=False),
+        T.StructField("customer_id", T.StringType(), nullable=False),
+        T.StructField("email", T.StringType(), nullable=True),
+        T.StructField("email_domain", T.StringType(), nullable=True),
+        T.StructField("first_name", T.StringType(), nullable=True),
+        T.StructField("last_name", T.StringType(), nullable=True),
+        T.StructField("full_name", T.StringType(), nullable=True),
+        T.StructField("country_code", T.StringType(), nullable=False),
+        T.StructField("city", T.StringType(), nullable=True),
+        T.StructField("customer_status", T.StringType(), nullable=True),
+        T.StructField("is_active_customer", T.BooleanType(), nullable=False),
+        T.StructField("marketing_consent", T.BooleanType(), nullable=False),
+        T.StructField("registered_at", T.TimestampType(), nullable=True),
+        T.StructField("registration_date", T.DateType(), nullable=True),
+    ]
+)
+
+SPECIAL_CUSTOMERS = [
+    (
+        UNKNOWN_KEY,
+        UNKNOWN_MEMBER_ID,
+        None,
+        None,
+        None,
+        None,
+        "Unknown customer",
+        "ZZ",
+        None,
+        None,
+        False,
+        False,
+        None,
+        None,
+    ),
+    (
+        GUEST_CUSTOMER_KEY,
+        GUEST_CUSTOMER_ID,
+        None,
+        None,
+        None,
+        None,
+        "Guest customer",
+        "ZZ",
+        None,
+        None,
+        False,
+        False,
+        None,
+        None,
+    ),
+    (
+        ANONYMOUS_CUSTOMER_KEY,
+        ANONYMOUS_CUSTOMER_ID,
+        None,
+        None,
+        None,
+        None,
+        "Anonymous customer",
+        "ZZ",
+        None,
+        None,
+        False,
+        False,
+        None,
+        None,
+    ),
+]
 
 
 def transform_dim_customers(
@@ -41,10 +123,8 @@ def transform_dim_customers(
         F.lower(F.substring_index(F.col("email"), "@", -1)),
     )
 
-    dim_customers_df = silver_customers_df.select(
-        F.xxhash64(F.col("customer_id"))
-        .bitwiseAND(F.lit(NON_NEGATIVE_BIGINT_MASK))
-        .alias("customer_key"),
+    business_customers_df = silver_customers_df.select(
+        surrogate_key("customer_id").alias("customer_key"),
         F.col("customer_id"),
         F.col("email"),
         email_domain.alias("email_domain"),
@@ -67,76 +147,60 @@ def transform_dim_customers(
         F.to_date(F.col("created_at")).alias("registration_date"),
     )
 
+    special_customers_df = silver_customers_df.sparkSession.createDataFrame(
+        SPECIAL_CUSTOMERS,
+        schema=SPECIAL_CUSTOMER_SCHEMA,
+    )
+    dim_customers_df = business_customers_df.unionByName(special_customers_df)
+
     validate_dim_customers(dim_customers_df)
 
-    return dim_customers_df.withColumn(
-        "_gold_processed_at",
-        F.current_timestamp(),
-    )
+    return with_gold_processed_at(dim_customers_df)
 
 
 def validate_dim_customers(df: DataFrame) -> None:
-    null_key_count = df.filter(
-        F.col("customer_key").isNull() | F.col("customer_id").isNull()
-    ).count()
-
-    if null_key_count > 0:
-        raise ValueError(f"dim_customers validation failed: {null_key_count} rows have null keys.")
-
-    null_required_attribute_count = df.filter(
-        F.col("country_code").isNull()
-        | F.col("is_active_customer").isNull()
-        | F.col("marketing_consent").isNull()
-    ).count()
-
-    if null_required_attribute_count > 0:
-        raise ValueError(
-            "dim_customers validation failed: "
-            f"{null_required_attribute_count} rows have null required attributes."
-        )
-
-    duplicate_customer_id_count = (
-        df.groupBy("customer_id").count().filter(F.col("count") > 1).count()
+    dataset_name = "dim_customers"
+    validate_required_values(
+        df,
+        required_columns=[
+            "customer_key",
+            "customer_id",
+            "country_code",
+            "is_active_customer",
+            "marketing_consent",
+        ],
+        dataset_name=dataset_name,
     )
-
-    if duplicate_customer_id_count > 0:
-        raise ValueError(
-            "dim_customers validation failed: "
-            f"{duplicate_customer_id_count} duplicate customer_id values found."
-        )
-
-    duplicate_customer_key_count = (
-        df.groupBy("customer_key").count().filter(F.col("count") > 1).count()
+    validate_rule(
+        df,
+        invalid_when=~F.col("country_code").rlike(r"^[A-Z]{2}$"),
+        dataset_name=dataset_name,
+        rule_description="have invalid country codes",
     )
-
-    if duplicate_customer_key_count > 0:
-        raise ValueError(
-            "dim_customers validation failed: "
-            f"{duplicate_customer_key_count} duplicate customer_key values found."
-        )
+    validate_unique_key(
+        df,
+        key_columns=["customer_id"],
+        dataset_name=dataset_name,
+    )
+    validate_unique_key(
+        df,
+        key_columns=["customer_key"],
+        dataset_name=dataset_name,
+    )
 
 
 def write_dim_customers(
     dim_customers_df: DataFrame,
     output_path: str | Path,
 ) -> None:
-    write_delta(
-        df=dim_customers_df,
-        path=output_path,
-        mode="overwrite",
-        overwrite_schema=True,
-    )
+    write_gold(dim_customers_df, output_path)
 
 
 def write_dim_customers_table(
     dim_customers_df: DataFrame,
     output_table: str,
 ) -> None:
-    write_delta_table(
-        df=dim_customers_df,
-        table_name=output_table,
-        mode="overwrite",
-    )
+    write_gold_table(dim_customers_df, output_table)
 
 
 def run_dim_customers(

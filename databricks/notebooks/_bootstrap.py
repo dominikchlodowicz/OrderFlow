@@ -3,6 +3,7 @@
 # COMMAND ----------
 
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -24,6 +25,16 @@ class TableToTableRunner(Protocol):
         spark: Any,
         input_table: str,
         output_table: str,
+    ) -> None: ...
+
+
+class MultiTableToTableRunner(Protocol):
+    def __call__(
+        self,
+        *,
+        spark: Any,
+        output_table: str,
+        **input_tables: str,
     ) -> None: ...
 
 
@@ -154,6 +165,29 @@ def run_databricks_table_to_table_step(
         spark=spark,
         input_table=input_table,
         output_table=output_table,
+    )
+
+    print(f"{step_name} completed successfully.")
+
+
+def run_databricks_multi_table_to_table_step(
+    *,
+    step_name: str,
+    runner: MultiTableToTableRunner,
+    spark: Any,
+    input_tables: Mapping[str, str],
+    output_table: str,
+) -> None:
+    """Run a catalog transformation with multiple explicitly named inputs."""
+    print(f"Running {step_name}")
+    for input_name, input_table in input_tables.items():
+        print(f"Input {input_name}: {input_table}")
+    print(f"Output table: {output_table}")
+
+    runner(
+        spark=spark,
+        output_table=output_table,
+        **input_tables,
     )
 
     print(f"{step_name} completed successfully.")

@@ -258,6 +258,30 @@ def test_transform_dim_calendar_rejects_duplicate_date_keys(
         transform_dim_calendar(silver_df)
 
 
+def test_transform_dim_calendar_rejects_null_required_attribute(
+    spark: SparkSession,
+) -> None:
+    silver_df = create_silver_calendar_df(
+        spark=spark,
+        rows=[silver_calendar_row(day_name=None)],
+    )
+
+    with pytest.raises(ValueError, match="rows have null required attributes"):
+        transform_dim_calendar(silver_df)
+
+
+def test_transform_dim_calendar_rejects_invalid_calendar_domain(
+    spark: SparkSession,
+) -> None:
+    silver_df = create_silver_calendar_df(
+        spark=spark,
+        rows=[silver_calendar_row(quarter=5)],
+    )
+
+    with pytest.raises(ValueError, match="rows have invalid calendar values"):
+        transform_dim_calendar(silver_df)
+
+
 def test_run_dim_calendar_writes_delta_table(
     spark: SparkSession,
     tmp_path: Path,

@@ -4,8 +4,17 @@ from typing import Any
 
 import pytest
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
+from orderflow.gold.common import (
+    ANONYMOUS_CUSTOMER_ID,
+    ANONYMOUS_CUSTOMER_KEY,
+    GUEST_CUSTOMER_ID,
+    GUEST_CUSTOMER_KEY,
+    UNKNOWN_KEY,
+    UNKNOWN_MEMBER_ID,
+)
 from orderflow.gold.dim_customers import (
     run_dim_customers,
     transform_dim_customers,
@@ -105,7 +114,7 @@ def test_transform_dim_customers_creates_analytical_columns(
     )
 
     result_df = transform_dim_customers(silver_df)
-    result = result_df.first()
+    result = result_df.filter(F.col("customer_id") == "cust_000000000001").first()
 
     assert result is not None
     assert result_df.columns == EXPECTED_GOLD_COLUMNS
@@ -159,7 +168,10 @@ def test_transform_dim_customers_generates_non_negative_keys(
 
     customer_keys = [
         row["customer_key"]
-        for row in transform_dim_customers(silver_df).select("customer_key").collect()
+        for row in transform_dim_customers(silver_df)
+        .filter(F.col("customer_key") >= 0)
+        .select("customer_key")
+        .collect()
     ]
 
     assert all(customer_key >= 0 for customer_key in customer_keys)
@@ -178,7 +190,11 @@ def test_transform_dim_customers_handles_inactive_customer_and_invalid_email(
         ],
     )
 
-    result = transform_dim_customers(silver_df).first()
+    result = (
+        transform_dim_customers(silver_df)
+        .filter(F.col("customer_id") == "cust_000000000001")
+        .first()
+    )
 
     assert result is not None
     assert result["email_domain"] is None
@@ -210,7 +226,7 @@ def test_transform_dim_customers_rejects_null_customer_id(
         [silver_customer_row(customer_id=None)],
     )
 
-    with pytest.raises(ValueError, match="rows have null keys"):
+    with pytest.raises(ValueError, match="rows have null required fields"):
         transform_dim_customers(silver_df)
 
 
@@ -222,7 +238,7 @@ def test_transform_dim_customers_rejects_null_required_attribute(
         [silver_customer_row(marketing_consent=None)],
     )
 
-    with pytest.raises(ValueError, match="rows have null required attributes"):
+    with pytest.raises(ValueError, match="rows have null required fields"):
         transform_dim_customers(silver_df)
 
 
@@ -239,6 +255,25 @@ def test_transform_dim_customers_rejects_duplicate_customer_ids(
 
     with pytest.raises(ValueError, match="duplicate customer_id values"):
         transform_dim_customers(silver_df)
+
+
+def test_transform_dim_customers_adds_reserved_physical_members(
+    spark: SparkSession,
+) -> None:
+    result_df = transform_dim_customers(create_silver_customers_df(spark, [silver_customer_row()]))
+
+    special_members = {
+        row["customer_id"]: row for row in result_df.filter(F.col("customer_key") < 0).collect()
+    }
+
+    assert {member_id: row["customer_key"] for member_id, row in special_members.items()} == {
+        UNKNOWN_MEMBER_ID: UNKNOWN_KEY,
+        GUEST_CUSTOMER_ID: GUEST_CUSTOMER_KEY,
+        ANONYMOUS_CUSTOMER_ID: ANONYMOUS_CUSTOMER_KEY,
+    }
+    assert all(row["country_code"] == "ZZ" for row in special_members.values())
+    assert all(row["is_active_customer"] is False for row in special_members.values())
+    assert all(row["marketing_consent"] is False for row in special_members.values())
 
 
 def test_run_dim_customers_writes_delta_table(
@@ -269,6 +304,8 @@ def test_run_dim_customers_writes_delta_table(
 
     result_df = spark.read.format("delta").load(str(output_path))
 
-    assert result_df.count() == 2
+    assert result_df.count() == 5
     assert result_df.columns == EXPECTED_GOLD_COLUMNS
-    assert {row["email_domain"] for row in result_df.collect()} == {"example.com", "shop.example"}
+    assert {
+        row["email_domain"] for row in result_df.filter(F.col("customer_key") >= 0).collect()
+    } == {"example.com", "shop.example"}

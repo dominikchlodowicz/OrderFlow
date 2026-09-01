@@ -86,12 +86,53 @@ def validate_dim_calendar(
             "dim_calendar validation failed: " f"{null_key_count} rows have null keys."
         )
 
+    null_required_attribute_count = df.filter(
+        F.col("year").isNull()
+        | F.col("quarter").isNull()
+        | F.col("month").isNull()
+        | F.col("month_name").isNull()
+        | F.col("day_of_month").isNull()
+        | F.col("day_of_week").isNull()
+        | F.col("day_name").isNull()
+        | F.col("week_of_year").isNull()
+        | F.col("is_weekend").isNull()
+        | F.col("is_polish_public_holiday").isNull()
+    ).count()
+
+    if null_required_attribute_count > 0:
+        raise ValueError(
+            "dim_calendar validation failed: "
+            f"{null_required_attribute_count} rows have null required attributes."
+        )
+
+    invalid_calendar_value_count = df.filter(
+        ~F.col("quarter").between(1, 4)
+        | ~F.col("month").between(1, 12)
+        | ~F.col("day_of_month").between(1, 31)
+        | ~F.col("day_of_week").between(1, 7)
+        | ~F.col("week_of_year").between(1, 53)
+    ).count()
+
+    if invalid_calendar_value_count > 0:
+        raise ValueError(
+            "dim_calendar validation failed: "
+            f"{invalid_calendar_value_count} rows have invalid calendar values."
+        )
+
     duplicate_key_count = df.groupBy("date_key").count().filter(F.col("count") > 1).count()
 
     if duplicate_key_count > 0:
         raise ValueError(
             "dim_calendar validation failed: "
             f"{duplicate_key_count} duplicate date_key values found."
+        )
+
+    duplicate_date_count = df.groupBy("date_day").count().filter(F.col("count") > 1).count()
+
+    if duplicate_date_count > 0:
+        raise ValueError(
+            "dim_calendar validation failed: "
+            f"{duplicate_date_count} duplicate date_day values found."
         )
 
 
