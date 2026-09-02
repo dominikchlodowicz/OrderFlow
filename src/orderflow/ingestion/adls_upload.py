@@ -1,11 +1,10 @@
 import argparse
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from dotenv import load_dotenv
-
 
 DATASET_NAMES = (
     "calendar",

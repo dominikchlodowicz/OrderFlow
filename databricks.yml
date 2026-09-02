@@ -1,19 +1,44 @@
-# This is a Declarative Automation Bundle definition for OrderFlow.
-# The Databricks extension requires databricks.yml configuration file.
-# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
-
 bundle:
-  name: OrderFlow
+  name: orderflow
+  databricks_cli_version: ">=0.245.0"
+
+include:
+  - resources/*.yml
+
+variables:
+  cluster_policy_id:
+    description: Compute policy used by OrderFlow Lakeflow Jobs
+    lookup:
+      cluster_policy: orderflow-job-policy
+
+artifacts:
+  orderflow_wheel:
+    type: whl
+    path: .
+    build: python -m build --wheel
+    dynamic_version: true
+
+sync:
+  exclude:
+    - artifacts/**
+    - build/**
+    - data/**
+    - dev/**
+    - dist/**
+    - scripts/**
+    - src/**
+    - tests/**
+    - typings/**
+    - "*.duckdb"
+    - "*.duckdb.wal"
+    - "**/__pycache__/**"
+    - "**/*.pyc"
+    - "**/*.egg-info/**"
 
 targets:
   dev:
     mode: development
     default: true
+
     workspace:
       host: https://adb-7405608961291895.15.azuredatabricks.net
-
-  ## Optionally, there could be 'staging' or 'prod' targets here.
-  #
-  # prod:
-  #   workspace:
-  #     host: https://adb-7405608961291895.15.azuredatabricks.net

@@ -228,6 +228,7 @@ data/raw/*
 data/bronze/
 data/silver/
 data/gold/
+data/*
 .databricks
 
 # duckdb
