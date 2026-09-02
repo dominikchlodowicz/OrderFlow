@@ -4,19 +4,6 @@
 
 from typing import Any
 
-dbutils: Any
-spark: Any
-
-# COMMAND ----------
-
-# MAGIC %run ../_bootstrap
-
-# COMMAND ----------
-
-bootstrap_databricks_notebook(dbutils=dbutils, spark=spark)
-
-# COMMAND ----------
-
 from orderflow.config.constants import (
     CALENDAR_GOLD_TABLE,
     CAMPAIGNS_GOLD_TABLE,
@@ -27,14 +14,19 @@ from orderflow.config.constants import (
     REFUNDS_GOLD_TABLE,
     REFUNDS_SILVER_TABLE,
 )
+from orderflow.databricks.runtime import (
+    run_databricks_multi_table_to_table_step,
+)
 from orderflow.gold.fct_refunds import run_fct_refunds_tables
+
+spark: Any
 
 # COMMAND ----------
 
 run_databricks_multi_table_to_table_step(
     step_name="Gold fct_refunds transformation",
     runner=run_fct_refunds_tables,
-    spark=spark,
+    spark=spark,  # noqa: F821
     input_tables={
         "refunds_input_table": REFUNDS_SILVER_TABLE,
         "payments_input_table": PAYMENTS_SILVER_TABLE,

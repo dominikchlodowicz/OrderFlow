@@ -1,0 +1,523 @@
+resources:
+  jobs:
+    orderflow_pipeline:
+      name: "[${bundle.target}] OrderFlow pipeline"
+
+      description: >
+        OrderFlow medallion pipeline deployed through a Databricks bundle.
+        Entity chains are executed in two-wide waves to protect the
+        single-node job cluster from Python kernel overload.
+
+      max_concurrent_runs: 1
+
+      queue:
+        enabled: true
+
+      tags:
+        Project: orderflow
+        Environment: ${bundle.target}
+        ManagedBy: databricks-bundle
+
+      job_clusters:
+        - job_cluster_key: orderflow_job_cluster
+
+          new_cluster:
+            policy_id: ${var.cluster_policy_id}
+            apply_policy_default_values: true
+
+            spark_version: 17.3.x-scala2.13
+            runtime_engine: STANDARD
+
+            node_type_id: Standard_D4ads_v6
+            num_workers: 0
+
+            data_security_mode: SINGLE_USER
+
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*, 4]
+
+            custom_tags:
+              ResourceClass: SingleNode
+              Project: orderflow
+              Environment: ${bundle.target}
+              ManagedBy: databricks-bundle
+
+      tasks:
+        # ============================================================
+        # WAVE 1
+        # Two vertical entity chains:
+        # calendar and customers
+        # ============================================================
+
+        - task_key: bronze_calendar
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_calendar.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_calendar
+          depends_on:
+            - task_key: bronze_calendar
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_calendar.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: dim_calendar
+          depends_on:
+            - task_key: silver_calendar
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/03_dim_calendar.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: bronze_customers
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_customers.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_customers
+          depends_on:
+            - task_key: bronze_customers
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_customers.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: dim_customers
+          depends_on:
+            - task_key: silver_customers
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/03_dim_customers.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        # ============================================================
+        # WAVE 2
+        # Waits for both Wave 1 chains.
+        # Exchange rates and marketing campaigns.
+        # ============================================================
+
+        - task_key: bronze_exchange_rates
+          depends_on:
+            - task_key: dim_calendar
+            - task_key: dim_customers
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_exchange_rates.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_exchange_rates
+          depends_on:
+            - task_key: bronze_exchange_rates
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_exchange_rates.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: dim_currency
+          depends_on:
+            - task_key: silver_exchange_rates
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/03_dim_currency.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: fct_exchange_rates
+          depends_on:
+            - task_key: silver_exchange_rates
+            - task_key: dim_currency
+            - task_key: dim_calendar
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/04_fct_exchange_rates.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: bronze_marketing_campaigns
+          depends_on:
+            - task_key: dim_calendar
+            - task_key: dim_customers
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_marketing_campaigns.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_marketing_campaigns
+          depends_on:
+            - task_key: bronze_marketing_campaigns
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_marketing_campaigns.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: dim_campaigns
+          depends_on:
+            - task_key: silver_marketing_campaigns
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/03_dim_campaigns.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        # ============================================================
+        # WAVE 3
+        # Waits for both Wave 2 chains.
+        # Products and orders.
+        # ============================================================
+
+        - task_key: bronze_products
+          depends_on:
+            - task_key: fct_exchange_rates
+            - task_key: dim_campaigns
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_products.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_products
+          depends_on:
+            - task_key: bronze_products
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_products.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: dim_products
+          depends_on:
+            - task_key: silver_products
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/03_dim_products.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: bronze_orders
+          depends_on:
+            - task_key: fct_exchange_rates
+            - task_key: dim_campaigns
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_orders.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_orders
+          depends_on:
+            - task_key: bronze_orders
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_orders.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: fct_orders
+          depends_on:
+            - task_key: silver_orders
+            - task_key: dim_calendar
+            - task_key: dim_customers
+            - task_key: dim_campaigns
+            - task_key: dim_currency
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/04_fct_orders.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        # ============================================================
+        # WAVE 4
+        # Waits for products and orders.
+        # Order items and payments.
+        # ============================================================
+
+        - task_key: bronze_order_items
+          depends_on:
+            - task_key: dim_products
+            - task_key: fct_orders
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_order_items.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_order_items
+          depends_on:
+            - task_key: bronze_order_items
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_order_items.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: fct_order_items
+          depends_on:
+            - task_key: silver_order_items
+            - task_key: silver_orders
+            - task_key: dim_calendar
+            - task_key: dim_customers
+            - task_key: dim_products
+            - task_key: dim_campaigns
+            - task_key: dim_currency
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/04_fct_order_items.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: bronze_payments
+          depends_on:
+            - task_key: dim_products
+            - task_key: fct_orders
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_payments.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_payments
+          depends_on:
+            - task_key: bronze_payments
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_payments.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: fct_payments
+          depends_on:
+            - task_key: silver_payments
+            - task_key: silver_orders
+            - task_key: dim_calendar
+            - task_key: dim_customers
+            - task_key: dim_campaigns
+            - task_key: dim_currency
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/04_fct_payments.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        # ============================================================
+        # WAVE 5
+        # Refunds and shipments.
+        # ============================================================
+
+        - task_key: bronze_refunds
+          depends_on:
+            - task_key: fct_order_items
+            - task_key: fct_payments
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_refunds.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_refunds
+          depends_on:
+            - task_key: bronze_refunds
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_refunds.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: fct_refunds
+          depends_on:
+            - task_key: silver_refunds
+            - task_key: silver_payments
+            - task_key: silver_orders
+            - task_key: dim_calendar
+            - task_key: dim_customers
+            - task_key: dim_campaigns
+            - task_key: dim_currency
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/04_fct_refunds.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: bronze_shipments
+          depends_on:
+            - task_key: fct_order_items
+            - task_key: fct_payments
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_shipments.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_shipments
+          depends_on:
+            - task_key: bronze_shipments
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_shipments.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: fct_shipments
+          depends_on:
+            - task_key: silver_shipments
+            - task_key: silver_orders
+            - task_key: dim_calendar
+            - task_key: dim_customers
+            - task_key: dim_campaigns
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/04_fct_shipments.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        # ============================================================
+        # WAVE 6
+        # Final vertical entity chain.
+        # ============================================================
+
+        - task_key: bronze_web_events
+          depends_on:
+            - task_key: fct_refunds
+            - task_key: fct_shipments
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/bronze/01_bronze_web_events.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: silver_web_events
+          depends_on:
+            - task_key: bronze_web_events
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/silver/02_silver_web_events.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        - task_key: fct_web_events
+          depends_on:
+            - task_key: silver_web_events
+            - task_key: dim_calendar
+            - task_key: dim_customers
+            - task_key: dim_products
+            - task_key: dim_campaigns
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/04_fct_web_events.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
