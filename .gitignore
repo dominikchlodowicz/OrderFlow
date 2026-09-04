@@ -236,3 +236,8 @@ data/*
 *.duckdb.wal
 *.duckdb.tmp
 .duckdb/
+
+# Airflow
+airflow/.env
+airflow/logs/
+airflow/config/airflow.cfg
