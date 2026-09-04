@@ -8,6 +8,25 @@ resources:
         Entity chains are executed in two-wide waves to protect the
         single-node job cluster from Python kernel overload.
 
+      # Runtime contract used by Airflow and direct Databricks runs.
+      # Job parameters are automatically pushed down to notebook tasks
+      # and can be read with dbutils.widgets.get("<parameter_name>").
+      parameters:
+        - name: environment
+          default: ${bundle.target}
+
+        - name: batch_id
+          default: '{{job.start_time.iso_date}}'
+
+        - name: landing_path
+          default: abfss://lakehouse@storderflowdevfrc1.dfs.core.windows.net/bronze/landing
+
+        - name: orchestrator
+          default: databricks
+
+        - name: orchestrator_run_id
+          default: '{{job.run_id}}'
+
       max_concurrent_runs: 1
 
       queue:
