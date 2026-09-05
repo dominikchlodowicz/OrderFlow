@@ -59,7 +59,7 @@ Table silver_order_items {
 Table silver_orders {
   order_id varchar [pk, not null, unique]
   customer_id varchar
-  order_status varchar [not null, note: 'One of: created, paid, shipped, cancelled, returned']
+  order_status varchar [not null, note: 'One of: created, paid, shipped, delivered, cancelled, partially_refunded, refunded']
   order_created_at timestamp [not null]
   order_updated_at timestamp [note: 'Must not precede order_created_at']
   country_code varchar [not null, note: 'Uppercase ISO 3166-1 alpha-2 country code']
@@ -79,7 +79,7 @@ Table silver_payments {
   order_id varchar [not null, note: 'Source order identifier']
   payment_attempt_number integer [not null]
   payment_method varchar [not null, note: 'One of: card, paypal, blik, bank_transfer, on delivery, online installments']
-  payment_status varchar [not null, note: 'One of: captured, authorized, failed']
+  payment_status varchar [not null, note: 'One of: captured, authorized, failed, refunded']
   failure_reason varchar [note: 'Required when payment_status = failed. One of: timeout, insufficient_funds, card_declined. Otherwise null.']
   amount decimal(18, 2) [not null, note: 'Must be >= 0']
   currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
@@ -96,7 +96,7 @@ Table silver_web_events {
   session_id varchar [not null]
   customer_id varchar
   anonymous_id varchar [not null]
-  event_type varchar [not null, note: 'TODO: add one-of rule after Bronze ingestion to identify the event types in the source data']
+  event_type varchar [not null, note: 'One of: page_view, product_view, add_to_cart, checkout_started, purchase_completed']
   event_timestamp timestamp
   product_id varchar [note: 'Required only for product-related event types']
   campaign_id varchar
@@ -113,7 +113,7 @@ Table silver_shipments {
   shipment_id varchar [pk, not null, unique, note: 'Source shipment identifier']
   order_id varchar [not null]
   carrier varchar [not null]
-  shipment_status varchar [not null, note: 'One of: lost, shipped, delivered']
+  shipment_status varchar [not null, note: 'One of: lost, shipped, delivered, returned']
   shipped_at timestamp [not null]
   estimated_delivery_at date [note: 'estimated_delivery_at >= DATE(shipped_at)']
   delivered_at timestamp [note: 'If shipment_status = delivered, must not be null and must be >= shipped_at']
@@ -132,7 +132,7 @@ Table silver_refunds {
   order_id varchar [not null]
   payment_id varchar [not null]
   refund_reason varchar
-  refund_status varchar [not null, note: 'TODO: add one-of rule after Bronze ingestion to identify the refund statuses in the source data']
+  refund_status varchar [not null, note: 'One of: processed, rejected']
   refund_amount decimal(18, 2) [not null, note: 'Must be >= 0']
   currency varchar [not null, note: 'Uppercase ISO 4217 currency code']
   created_at timestamp [not null]
