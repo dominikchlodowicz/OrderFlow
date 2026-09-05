@@ -34,9 +34,7 @@ def exchange_rate_row(**overrides: object) -> dict[str, object]:
 def test_exchange_rates_casts_rounds_and_normalizes_contract_fields(
     spark: SparkSession,
 ) -> None:
-    result_df = transform_exchange_rates_silver(
-        spark.createDataFrame([exchange_rate_row()])
-    )
+    result_df = transform_exchange_rates_silver(spark.createDataFrame([exchange_rate_row()]))
     row = result_df.first()
 
     assert result_df.columns == EXPECTED_COLUMNS

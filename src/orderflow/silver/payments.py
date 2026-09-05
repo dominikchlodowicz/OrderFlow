@@ -123,10 +123,7 @@ def validate_payments_silver(df: DataFrame) -> None:
     validate_rule(
         df,
         invalid_when=(F.col("payment_status") == "failed")
-        & (
-            F.col("failure_reason").isNull()
-            | ~F.col("failure_reason").isin(FAILURE_REASONS)
-        ),
+        & (F.col("failure_reason").isNull() | ~F.col("failure_reason").isin(FAILURE_REASONS)),
         dataset_name=dataset_name,
         rule_description="have an invalid failure reason",
     )

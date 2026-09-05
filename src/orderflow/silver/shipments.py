@@ -115,10 +115,7 @@ def validate_shipments_silver(df: DataFrame) -> None:
     validate_rule(
         df,
         invalid_when=((F.col("shipment_status") == "delivered") & F.col("delivered_at").isNull())
-        | (
-            F.col("delivered_at").isNotNull()
-            & (F.col("delivered_at") < F.col("shipped_at"))
-        ),
+        | (F.col("delivered_at").isNotNull() & (F.col("delivered_at") < F.col("shipped_at"))),
         dataset_name=dataset_name,
         rule_description="have invalid delivered_at values",
     )

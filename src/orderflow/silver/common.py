@@ -110,9 +110,7 @@ def validate_required_values(
     dataset_name: str,
 ) -> None:
     invalid_rows = df.filter(
-        F.greatest(
-            *[F.col(column_name).isNull().cast("int") for column_name in required_columns]
-        )
+        F.greatest(*[F.col(column_name).isNull().cast("int") for column_name in required_columns])
         == 1
     ).count()
 
@@ -150,8 +148,7 @@ def validate_rule(
 
     if invalid_rows > 0:
         raise ValueError(
-            f"{dataset_name} Silver validation failed: "
-            f"{invalid_rows} rows {rule_description}."
+            f"{dataset_name} Silver validation failed: " f"{invalid_rows} rows {rule_description}."
         )
 
 

@@ -96,8 +96,7 @@ def validate_refunds_silver(df: DataFrame) -> None:
     )
     validate_rule(
         df,
-        invalid_when=(F.col("refund_amount") < 0)
-        | (F.col("processed_at") < F.col("created_at")),
+        invalid_when=(F.col("refund_amount") < 0) | (F.col("processed_at") < F.col("created_at")),
         dataset_name=dataset_name,
         rule_description="have invalid refund amount or chronology",
     )
