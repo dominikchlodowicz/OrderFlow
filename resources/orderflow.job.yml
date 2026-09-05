@@ -15,6 +15,9 @@ resources:
         - name: environment
           default: ${bundle.target}
 
+        - name: catalog
+          default: orderflow_${bundle.target}
+
         - name: batch_id
           default: '{{job.start_time.iso_date}}'
 
@@ -535,6 +538,38 @@ resources:
           job_cluster_key: orderflow_job_cluster
           notebook_task:
             notebook_path: ../databricks/notebooks/gold/04_fct_web_events.py
+          libraries:
+            - whl: ../dist/*.whl
+          max_retries: 1
+          min_retry_interval_millis: 60000
+          timeout_seconds: 3600
+
+        # ============================================================
+        # FINAL QUALITY GATE
+        # Runs only after the complete Gold dimensional model exists.
+        # ============================================================
+
+        - task_key: gold_quality_checks
+          depends_on:
+            - task_key: dim_calendar
+            - task_key: dim_customers
+            - task_key: dim_products
+            - task_key: dim_campaigns
+            - task_key: dim_currency
+            - task_key: fct_orders
+            - task_key: fct_order_items
+            - task_key: fct_payments
+            - task_key: fct_refunds
+            - task_key: fct_shipments
+            - task_key: fct_web_events
+            - task_key: fct_exchange_rates
+          job_cluster_key: orderflow_job_cluster
+          notebook_task:
+            notebook_path: ../databricks/notebooks/gold/05_gold_quality_checks.py
+            base_parameters:
+              catalog: '{{job.parameters.catalog}}'
+              environment: '{{job.parameters.environment}}'
+              batch_id: '{{job.parameters.batch_id}}'
           libraries:
             - whl: ../dist/*.whl
           max_retries: 1
