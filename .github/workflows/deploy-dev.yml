@@ -1,0 +1,126 @@
+name: Deploy development
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      run_pipeline:
+        description: Run the deployed OrderFlow Lakeflow job after deployment
+        required: false
+        default: false
+        type: boolean
+      batch_id:
+        description: Optional ISO batch ID (YYYY-MM-DD); blank uses the job start date
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: databricks-dev-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Databricks development bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: development
+
+    steps:
+      - name: Check out exact deployment commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install bundle artifact build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@8821c27b1fe57472264eeb6e50c1f31d69552f28 # v1.10.0
+
+      - name: Check required Databricks configuration
+        shell: bash
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          BUNDLE_VAR_cluster_policy_id: ${{ vars.DATABRICKS_CLUSTER_POLICY_ID }}
+        run: |
+          missing=()
+          for name in DATABRICKS_HOST DATABRICKS_TOKEN BUNDLE_VAR_cluster_policy_id; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Missing required GitHub configuration: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Validate development bundle
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          BUNDLE_VAR_cluster_policy_id: ${{ vars.DATABRICKS_CLUSTER_POLICY_ID }}
+        run: databricks bundle validate -t dev
+
+      - name: Deploy development bundle
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          BUNDLE_VAR_cluster_policy_id: ${{ vars.DATABRICKS_CLUSTER_POLICY_ID }}
+        run: databricks bundle deploy -t dev
+
+      - name: Summarize development bundle
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          BUNDLE_VAR_cluster_policy_id: ${{ vars.DATABRICKS_CLUSTER_POLICY_ID }}
+        run: databricks bundle summary -t dev
+
+  run-pipeline:
+    name: Run development pipeline
+    if: github.event_name == 'workflow_dispatch' && inputs.run_pipeline
+    needs:
+      - deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    environment: development
+
+    steps:
+      - name: Check out exact deployment commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@8821c27b1fe57472264eeb6e50c1f31d69552f28 # v1.10.0
+
+      - name: Run deployed OrderFlow job
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          BUNDLE_VAR_cluster_policy_id: ${{ vars.DATABRICKS_CLUSTER_POLICY_ID }}
+          PIPELINE_BATCH_ID: ${{ inputs.batch_id }}
+        run: |
+          if [[ -n "$PIPELINE_BATCH_ID" ]]; then
+            databricks bundle run -t dev orderflow_pipeline -- --batch_id "$PIPELINE_BATCH_ID"
+          else
+            databricks bundle run -t dev orderflow_pipeline
+          fi
