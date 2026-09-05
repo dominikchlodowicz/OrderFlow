@@ -79,7 +79,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Databricks CLI
-        uses: databricks/setup-cli@8821c27b1fe57472264eeb6e50c1f31d69552f28 # v1.10.0
+        uses: databricks/setup-cli@602f285bac0c85e5985bf4c16d5a2befed0578d9 # v1.14.1
 
       - name: Check required Databricks configuration
         shell: bash
