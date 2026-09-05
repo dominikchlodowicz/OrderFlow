@@ -108,8 +108,7 @@ def validate_web_events_silver(df: DataFrame) -> None:
     )
     validate_rule(
         df,
-        invalid_when=F.col("event_type").isin(PRODUCT_EVENT_TYPES)
-        & F.col("product_id").isNull(),
+        invalid_when=F.col("event_type").isin(PRODUCT_EVENT_TYPES) & F.col("product_id").isNull(),
         dataset_name=dataset_name,
         rule_description="have product events without product_id",
     )

@@ -28,7 +28,7 @@ ORDER_STATUSES = [
     "delivered",
     "cancelled",
     "partially_refunded",
-    "refunded"
+    "refunded",
 ]
 
 ORDERS_REQUIRED_COLUMNS = [

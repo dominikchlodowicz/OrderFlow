@@ -33,34 +33,20 @@ def upload_directory(
     config: AdlsUploadConfig,
     dataset_name: str | None = None,
 ) -> int:
-    blob_service_client = BlobServiceClient.from_connection_string(
-        config.connection_string
-    )
-    container_client = blob_service_client.get_container_client(
-        config.container_name
-    )
+    blob_service_client = BlobServiceClient.from_connection_string(config.connection_string)
+    container_client = blob_service_client.get_container_client(config.container_name)
 
-    upload_root = (
-        config.local_path / dataset_name
-        if dataset_name
-        else config.local_path
-    )
+    upload_root = config.local_path / dataset_name if dataset_name else config.local_path
 
     if not upload_root.is_dir():
-        raise FileNotFoundError(
-            f"Upload directory does not exist: {upload_root}"
-        )
+        raise FileNotFoundError(f"Upload directory does not exist: {upload_root}")
 
     uploaded_count = 0
 
     for file_path in upload_root.rglob("*.csv"):
-        relative_path = file_path.relative_to(
-            config.local_path
-        ).as_posix()
+        relative_path = file_path.relative_to(config.local_path).as_posix()
 
-        blob_path = (
-            f"{config.target_prefix.strip('/')}/{relative_path}"
-        )
+        blob_path = f"{config.target_prefix.strip('/')}/{relative_path}"
 
         blob_client = container_client.get_blob_client(blob_path)
 
@@ -68,16 +54,11 @@ def upload_directory(
             blob_client.upload_blob(
                 file_data,
                 overwrite=True,
-                content_settings=ContentSettings(
-                    content_type="text/csv"
-                ),
+                content_settings=ContentSettings(content_type="text/csv"),
             )
 
         uploaded_count += 1
-        print(
-            f"Uploaded: {file_path} "
-            f"-> {config.container_name}/{blob_path}"
-        )
+        print(f"Uploaded: {file_path} " f"-> {config.container_name}/{blob_path}")
 
     print(f"Done. Uploaded {uploaded_count} files.")
     return uploaded_count
@@ -86,23 +67,15 @@ def upload_directory(
 def config_from_env() -> AdlsUploadConfig:
     load_dotenv()
 
-    local_path = Path(
-        os.environ.get("LOCAL_RAW_DATA_DIR", "data/raw")
-    )
+    local_path = Path(os.environ.get("LOCAL_RAW_DATA_DIR", "data/raw"))
 
     if not local_path.is_dir():
-        raise FileNotFoundError(
-            f"Local directory does not exist: {local_path}"
-        )
+        raise FileNotFoundError(f"Local directory does not exist: {local_path}")
 
     return AdlsUploadConfig(
         local_path=local_path,
-        container_name=os.environ[
-            "AZURE_STORAGE_CONTAINER_NAME"
-        ],
-        connection_string=os.environ[
-            "AZURE_STORAGE_CONNECTION_STRING"
-        ],
+        container_name=os.environ["AZURE_STORAGE_CONTAINER_NAME"],
+        connection_string=os.environ["AZURE_STORAGE_CONNECTION_STRING"],
         target_prefix=os.environ.get(
             "ADLS_LANDING_PREFIX",
             "landing",
@@ -111,9 +84,7 @@ def config_from_env() -> AdlsUploadConfig:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Upload generated CSV datasets to ADLS landing."
-    )
+    parser = argparse.ArgumentParser(description="Upload generated CSV datasets to ADLS landing.")
     parser.add_argument(
         "--dataset",
         choices=DATASET_NAMES,

@@ -12,8 +12,7 @@ from pyspark.sql import SparkSession
 
 def build_local_spark(app_name: str = "orderflow-local") -> SparkSession:
     builder = (
-        SparkSession.builder
-        .appName(app_name)
+        SparkSession.builder.appName(app_name)
         .master("local[2]")
         .config("spark.ui.enabled", "false")
         .config("spark.driver.host", "127.0.0.1")

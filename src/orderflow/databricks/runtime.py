@@ -177,9 +177,7 @@ def verify_catalog_table(
 
     if order_by is not None:
         if order_by not in dataframe.columns:
-            raise ValueError(
-                f"Cannot order {table_name} by missing column: {order_by}"
-            )
+            raise ValueError(f"Cannot order {table_name} by missing column: {order_by}")
 
         dataframe = dataframe.orderBy(order_by)
 
